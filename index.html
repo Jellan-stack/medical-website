@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- === FIREBASE BACKEND (LIBRE) === -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
     <script>
         tailwind.config = {
             theme: {
@@ -26,15 +30,13 @@
             }
         }
     </script>
-
     <style>
-        body {
+        html, body {
             background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', system-ui, sans-serif;
+            scroll-behavior: smooth;
         }
-
-        /* Animations */
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
@@ -56,18 +58,23 @@
             25% { transform: translateX(-5px); }
             75% { transform: translateX(5px); }
         }
-
         .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; opacity:0; }
         .scale-in { animation: scaleIn 0.5s ease-out forwards; opacity:0; }
         .slide-in-right { animation: slideInRight 0.5s ease-out forwards; opacity:0; }
         .pulse-soft { animation: pulseSoft 2s infinite; }
         .shake { animation: shake 0.4s ease-in-out; }
-
-        /* Page transitions */
-        .page { display: none; opacity: 0; transition: opacity 0.4s ease; }
-        .page.active { display: block; opacity: 1; animation: fadeInUp 0.5s ease-out forwards; }
-
-        /* Glass card */
+        .page { 
+            display: none; 
+            opacity: 0; 
+            transition: opacity 0.4s ease;
+            min-height: 100vh;
+            overflow-y: auto;
+        }
+        .page.active { 
+            display: flex; 
+            opacity: 1; 
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
         .glass-card {
             background: rgba(255,255,255,0.88);
             backdrop-filter: blur(20px);
@@ -77,8 +84,6 @@
             transition: all 0.4s ease;
         }
         .glass-card:hover { transform: translateY(-5px); box-shadow: 0 25px 50px -12px rgba(37,99,235,0.18); }
-
-        /* Inputs */
         .input-field {
             border-radius: 14px;
             border: 2px solid #e5e7eb;
@@ -89,8 +94,6 @@
             box-shadow: 0 0 0 6px rgba(37,99,235,0.1);
             outline: none;
         }
-
-        /* Buttons */
         .btn-primary {
             background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
             border-radius: 14px;
@@ -99,10 +102,7 @@
         }
         .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 15px 35px -10px rgba(37,99,235,0.35); }
         .btn-primary:active { transform: translateY(0); }
-
         .btn-admin { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); }
-
-        /* Tabs */
         .tab-btn {
             transition: all 0.3s ease;
             border-bottom: 3px solid transparent;
@@ -114,32 +114,28 @@
             font-weight: 600;
         }
         .tab-btn:hover:not(.active) { background: rgba(0,0,0,0.03); border-bottom-color: #ddd; }
-
-        /* Request card */
         .req-card {
             border-radius: 16px;
             border-left: 5px solid;
             transition: all 0.35s ease;
         }
         .req-card:hover { transform: scale(1.015); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
-
-        /* Toast notification */
         .toast {
             transform: translateX(120%);
             transition: transform 0.5s cubic-bezier(0.16,1,0.3,1);
         }
         .toast.show { transform: translateX(0); }
-
-        /* Scrollbar */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #bfdbfe; border-radius: 10px; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
 <!-- ============== LOGIN PAGE ============== -->
-<div id="loginPage" class="page active flex items-center justify-center min-h-screen px-4">
-    <div class="glass-card p-8 w-full max-w-md scale-in">
+<div id="loginPage" class="page active items-center justify-center px-4">
+    <div class="glass-card p-8 w-full max-w-md scale-in my-8">
         <div class="text-center mb-8">
             <div class="w-16 h-16 rounded-2xl bg-medblue-100 flex items-center justify-center text-medblue-700 mx-auto mb-3 pulse-soft">
                 <i class="fa-solid fa-heart-pulse text-3xl"></i>
@@ -147,16 +143,12 @@
             <h1 class="text-2xl font-bold text-gray-800">Clinic Visit Request System</h1>
             <p class="text-gray-500 mt-1">Pumili ng uri ng pag-access</p>
         </div>
-
-        <!-- User Access Button -->
         <div class="mb-6">
             <h3 class="text-sm font-semibold text-gray-600 mb-3">👤 Estudyante / Guro</h3>
             <button onclick="switchPage('userPage')" class="btn-primary w-full py-3.5 text-white font-semibold">
                 <i class="fa-solid fa-file-pen mr-2"></i> Pumunta sa Form
             </button>
         </div>
-
-        <!-- Admin Login -->
         <div class="border-t pt-6">
             <h3 class="text-sm font-semibold text-gray-600 mb-3">🏥 Nurse / Admin</h3>
             <div class="space-y-3">
@@ -172,163 +164,140 @@
 </div>
 
 <!-- ============== USER / FORM PAGE ============== -->
-<div id="userPage" class="page px-4 py-6 max-w-2xl mx-auto">
-    <div class="flex justify-between items-center mb-6 slide-in-right">
-        <div>
-            <h2 class="text-xl font-bold text-medblue-800">📝 Clinic Visit Request Form</h2>
-            <p class="text-sm text-gray-500">Punan ang impormasyon bago pumunta sa clinic</p>
-        </div>
-        <button onclick="logoutBack()" class="text-sm text-red-500 hover:text-red-700 transition-colors">
-            <i class="fa-solid fa-arrow-left mr-1"></i> Bumalik
-        </button>
-    </div>
-
-    <div class="glass-card p-6 fade-in-up">
-        <form id="visitForm" class="space-y-4">
-            <!-- Full Name -->
+<div id="userPage" class="page items-start justify-center px-4 py-6">
+    <div class="w-full max-w-2xl mx-auto">
+        <div class="flex justify-between items-center mb-6 slide-in-right">
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Buong Pangalan <span class="text-medred-500">*</span></label>
-                <input type="text" id="fullname" placeholder="Ipasok ang iyong buong pangalan" class="w-full px-4 py-3 input-field" required>
+                <h2 class="text-xl font-bold text-medblue-800">📝 Clinic Visit Request Form</h2>
+                <p class="text-sm text-gray-500">Punan ang impormasyon bago pumunta sa clinic</p>
             </div>
-
-            <!-- Role & ID -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button onclick="logoutBack()" class="text-sm text-red-500 hover:text-red-700 transition-colors">
+                <i class="fa-solid fa-arrow-left mr-1"></i> Bumalik
+            </button>
+        </div>
+        <div class="glass-card p-6 fade-in-up">
+            <form id="visitForm" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Katungkulan <span class="text-medred-500">*</span></label>
-                    <select id="role" class="w-full px-4 py-3 input-field" required>
-                        <option value="">Pumili...</option>
-                        <option value="Estudyante">Estudyante</option>
-                        <option value="Guro">Guro / Pangkatan</option>
-                        <option value="Staff">Empleyado</option>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Buong Pangalan <span class="text-medred-500">*</span></label>
+                    <input type="text" id="fullname" placeholder="Ipasok ang iyong buong pangalan" class="w-full px-4 py-3 input-field" required>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Katungkulan <span class="text-medred-500">*</span></label>
+                        <select id="role" class="w-full px-4 py-3 input-field" required>
+                            <option value="">Pumili...</option>
+                            <option value="Estudyante">Estudyante</option>
+                            <option value="Guro">Guro / Pangkatan</option>
+                            <option value="Staff">Empleyado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">ID Bilang</label>
+                        <input type="text" id="idNumber" placeholder="ID bilang (opsyonal)" class="w-full px-4 py-3 input-field">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Kurso at Taon / Antas <span class="text-medred-500">*</span></label>
+                    <input type="text" id="courseYear" placeholder="Hal. BSIT 2nd Year / Grade 10" class="w-full px-4 py-3 input-field" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Kasalukuyang Lokasyon <span class="text-medred-500">*</span></label>
+                    <select id="locationSelect" class="w-full px-4 py-3 input-field" required>
+                        <option value="">Saan ka naroroon?</option>
+                        <option value="Silid-aralan">Silid-aralan</option>
+                        <option value="Paaralan / Opisina">Opisina ng Paaralan</option>
+                        <option value="Canteen / Kantina">Kantina</option>
+                        <option value="Gym / Bulwagan">Gym o Bulwagan</option>
+                        <option value="Lab / Silid-kasanayan">Laboratoryo</option>
+                        <option value="Labas ng Paaralan">Labas ng Paaralan</option>
+                        <option value="Iba pa">Iba pa — ilarawan</option>
                     </select>
                 </div>
+                <div id="customLocationWrapper" class="hidden mt-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Ilarawan ang lokasyon</label>
+                    <input type="text" id="customLocationText" placeholder="Hal. Sa gusali ng Agham, 2nd Palapag" class="w-full px-4 py-3 input-field">
+                </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">ID Bilang</label>
-                    <input type="text" id="idNumber" placeholder="ID bilang (opsyonal)" class="w-full px-4 py-3 input-field">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Dahilan ng Pagpunta sa Clinic <span class="text-medred-500">*</span></label>
+                    <select id="concernSelect" class="w-full px-4 py-3 input-field" required>
+                        <option value="">Pumili ng dahilan...</option>
+                        <option value="Sakit ng Ulo / Pagkahilo">🤕 Sakit ng Ulo / Pagkahilo</option>
+                        <option value="Lagnat / Panginginig">🤒 Lagnat / Panginginig</option>
+                        <option value="Ubo, Sipon o Sakit ng Lalamunan">😷 Ubo, Sipon o Sakit ng Lalamunan</option>
+                        <option value="Sakit ng Tiyan / Pagkahilo">🫃 Sakit ng Tiyan / Pagkahilo</option>
+                        <option value="Sugat, Pilay o Pinsala">🤕 Sugat, Pilay o Pinsala</option>
+                        <option value="Pananakit ng Katawan / Kalamnan">💪 Pananakit ng Katawan o Kalamnan</option>
+                        <option value="Humihingi ng Gamot / Paunang Lunas">💊 Humihingi ng Gamot / Paunang Lunas</option>
+                        <option value="Pangkalahatang Pagsusuri / Pahinga">🏥 Pangkalahatang Pagsusuri / Pahinga</option>
+                        <option value="Iba pa">📝 Iba pa — ilarawan sa ibaba</option>
+                    </select>
                 </div>
-            </div>
-
-            <!-- Course & Year -->
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Kurso at Taon / Antas <span class="text-medred-500">*</span></label>
-                <input type="text" id="courseYear" placeholder="Hal. BSIT 2nd Year / Grade 10" class="w-full px-4 py-3 input-field" required>
-            </div>
-
-            <!-- Location -->
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Kasalukuyang Lokasyon <span class="text-medred-500">*</span></label>
-                <select id="locationSelect" class="w-full px-4 py-3 input-field" required>
-                    <option value="">Saan ka naroroon?</option>
-                    <option value="Silid-aralan">Silid-aralan</option>
-                    <option value="Paaralan / Opisina">Opisina ng Paaralan</option>
-                    <option value="Canteen / Kantina">Kantina</option>
-                    <option value="Gym / Bulwagan">Gym o Bulwagan</option>
-                    <option value="Lab / Silid-kasanayan">Laboratoryo</option>
-                    <option value="Labas ng Paaralan">Labas ng Paaralan</option>
-                    <option value="Iba pa">Iba pa — ilarawan</option>
-                </select>
-            </div>
-            <div id="customLocationWrapper" class="hidden mt-2">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Ilarawan ang lokasyon</label>
-                <input type="text" id="customLocationText" placeholder="Hal. Sa gusali ng Agham, 2nd Palapag" class="w-full px-4 py-3 input-field">
-            </div>
-
-            <!-- Concern / Reason -->
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Dahilan ng Pagpunta sa Clinic <span class="text-medred-500">*</span></label>
-                <select id="concernSelect" class="w-full px-4 py-3 input-field" required>
-                    <option value="">Pumili ng dahilan...</option>
-                    <option value="Sakit ng Ulo / Pagkahilo">🤕 Sakit ng Ulo / Pagkahilo</option>
-                    <option value="Lagnat / Panginginig">🤒 Lagnat / Panginginig</option>
-                    <option value="Ubo, Sipon o Sakit ng Lalamunan">😷 Ubo, Sipon o Sakit ng Lalamunan</option>
-                    <option value="Sakit ng Tiyan / Pagkahilo">🫃 Sakit ng Tiyan / Pagkahilo</option>
-                    <option value="Sugat, Pilay o Pinsala">🤕 Sugat, Pilay o Pinsala</option>
-                    <option value="Pananakit ng Katawan / Kalamnan">💪 Pananakit ng Katawan o Kalamnan</option>
-                    <option value="Humihingi ng Gamot / Paunang Lunas">💊 Humihingi ng Gamot / Paunang Lunas</option>
-                    <option value="Pangkalahatang Pagsusuri / Pahinga">🏥 Pangkalahatang Pagsusuri / Pahinga</option>
-                    <option value="Iba pa">📝 Iba pa — ilarawan sa ibaba</option>
-                </select>
-            </div>
-            <div id="customConcernWrapper" class="hidden mt-2">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Ilarawan ang iyong hinaing</label>
-                <textarea id="customConcernText" rows="3" placeholder="I-type dito ang iyong kalusugang hinaing..." class="w-full px-4 py-3 input-field"></textarea>
-            </div>
-
-            <!-- Severity -->
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">Antas ng Sakit o Pagkahilo</label>
-                <div class="flex flex-wrap gap-3">
-                    <label class="flex-1 min-w-[90px] cursor-pointer">
-                        <input type="radio" name="severity" value="Mahina" class="hidden peer">
-                        <div class="px-3 py-3 rounded-xl border-2 border-gray-200 text-center transition-all peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-800 peer-checked:font-semibold">
-                            😊 Mahina
-                        </div>
-                    </label>
-                    <label class="flex-1 min-w-[90px] cursor-pointer">
-                        <input type="radio" name="severity" value="Katamtaman" class="hidden peer" checked>
-                        <div class="px-3 py-3 rounded-xl border-2 border-gray-200 text-center transition-all peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-800 peer-checked:font-semibold">
-                            😐 Katamtaman
-                        </div>
-                    </label>
-                    <label class="flex-1 min-w-[90px] cursor-pointer">
-                        <input type="radio" name="severity" value="Malala" class="hidden peer">
-                        <div class="px-3 py-3 rounded-xl border-2 border-gray-200 text-center transition-all peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-800 peer-checked:font-semibold">
-                            😣 Malala
-                        </div>
-                    </label>
+                <div id="customConcernWrapper" class="hidden mt-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Ilarawan ang iyong hinaing</label>
+                    <textarea id="customConcernText" rows="3" placeholder="I-type dito ang iyong kalusugang hinaing..." class="w-full px-4 py-3 input-field"></textarea>
                 </div>
-            </div>
-
-            <!-- Submit Button -->
-            <button type="submit" class="btn-primary w-full py-3.5 text-white font-semibold mt-4">
-                <i class="fa-solid fa-paper-plane mr-2"></i> Ipadala sa Clinic Nurse
-            </button>
-        </form>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Antas ng Sakit o Pagkahilo</label>
+                    <div class="flex flex-wrap gap-3">
+                        <label class="flex-1 min-w-[90px] cursor-pointer">
+                            <input type="radio" name="severity" value="Mahina" class="hidden peer">
+                            <div class="px-3 py-3 rounded-xl border-2 border-gray-200 text-center transition-all peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-800 peer-checked:font-semibold">😊 Mahina</div>
+                        </label>
+                        <label class="flex-1 min-w-[90px] cursor-pointer">
+                            <input type="radio" name="severity" value="Katamtaman" class="hidden peer" checked>
+                            <div class="px-3 py-3 rounded-xl border-2 border-gray-200 text-center transition-all peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-800 peer-checked:font-semibold">😐 Katamtaman</div>
+                        </label>
+                        <label class="flex-1 min-w-[90px] cursor-pointer">
+                            <input type="radio" name="severity" value="Malala" class="hidden peer">
+                            <div class="px-3 py-3 rounded-xl border-2 border-gray-200 text-center transition-all peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-800 peer-checked:font-semibold">😣 Malala</div>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" id="submitBtn" class="btn-primary w-full py-3.5 text-white font-semibold mt-4">
+                    <i class="fa-solid fa-paper-plane mr-2"></i> Ipadala sa Clinic Nurse
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 
 <!-- ============== NURSE / ADMIN DASHBOARD ============== -->
-<div id="adminPage" class="page px-4 py-6 max-w-4xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-        <div>
-            <h2 class="text-xl font-bold text-medgreen-700">🏥 Nurse Dashboard</h2>
-            <p class="text-sm text-gray-500">Pamahalaan ang mga kahilingan ng pagpunta sa clinic</p>
+<div id="adminPage" class="page items-start justify-center px-4 py-6">
+    <div class="w-full max-w-4xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h2 class="text-xl font-bold text-medgreen-700">🏥 Nurse Dashboard</h2>
+                <p class="text-sm text-gray-500">Pamahalaan ang mga kahilingan ng pagpunta sa clinic</p>
+            </div>
+            <button onclick="logoutBack()" class="text-sm text-red-500 hover:text-red-700 transition-colors">
+                <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Mag-Logout
+            </button>
         </div>
-        <button onclick="logoutBack()" class="text-sm text-red-500 hover:text-red-700 transition-colors">
-            <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Mag-Logout
-        </button>
-    </div>
-
-    <!-- Counters -->
-    <div class="grid grid-cols-3 gap-3 mb-6">
-        <div class="bg-medblue-50 rounded-xl p-4 text-center scale-in" style="animation-delay:0.1s;">
-            <p class="text-xs text-medblue-600 font-medium">Nakabinbin</p>
-            <p class="text-2xl font-bold text-medblue-800" id="pendingCount">0</p>
+        <div class="grid grid-cols-3 gap-3 mb-6">
+            <div class="bg-medblue-50 rounded-xl p-4 text-center scale-in" style="animation-delay:0.1s;">
+                <p class="text-xs text-medblue-600 font-medium">Nakabinbin</p>
+                <p class="text-2xl font-bold text-medblue-800" id="pendingCount">0</p>
+            </div>
+            <div class="bg-medamber-50 rounded-xl p-4 text-center scale-in" style="animation-delay:0.2s;">
+                <p class="text-xs text-medamber-600 font-medium">Inaasikaso</p>
+                <p class="text-2xl font-bold text-amber-700" id="progressCount">0</p>
+            </div>
+            <div class="bg-medgreen-50 rounded-xl p-4 text-center scale-in" style="animation-delay:0.3s;">
+                <p class="text-xs text-green-600 font-medium">Tapos na</p>
+                <p class="text-2xl font-bold text-green-700" id="doneCount">0</p>
+            </div>
         </div>
-        <div class="bg-medamber-50 rounded-xl p-4 text-center scale-in" style="animation-delay:0.2s;">
-            <p class="text-xs text-medamber-600 font-medium">Inaasikaso</p>
-            <p class="text-2xl font-bold text-amber-700" id="progressCount">0</p>
+        <div class="flex flex-wrap mb-4 bg-white rounded-xl shadow-sm overflow-hidden">
+            <button class="tab-btn active flex-1 py-3 px-4 text-sm" data-tab="pending">⏳ Nakabinbin</button>
+            <button class="tab-btn flex-1 py-3 px-4 text-sm" data-tab="processing">🔄 Inaasikaso</button>
+            <button class="tab-btn flex-1 py-3 px-4 text-sm" data-tab="done">✅ Tapos na</button>
         </div>
-        <div class="bg-medgreen-50 rounded-xl p-4 text-center scale-in" style="animation-delay:0.3s;">
-            <p class="text-xs text-green-600 font-medium">Tapos na</p>
-            <p class="text-2xl font-bold text-green-700" id="doneCount">0</p>
-        </div>
-    </div>
-
-    <!-- Status Tabs -->
-    <div class="flex flex-wrap mb-4 bg-white rounded-xl shadow-sm overflow-hidden">
-        <button class="tab-btn active flex-1 py-3 px-4 text-sm" data-tab="pending">⏳ Nakabinbin</button>
-        <button class="tab-btn flex-1 py-3 px-4 text-sm" data-tab="processing">🔄 Inaasikaso</button>
-        <button class="tab-btn flex-1 py-3 px-4 text-sm" data-tab="done">✅ Tapos na</button>
-    </div>
-
-    <!-- Request List by Tab -->
-    <div class="glass-card p-4">
-        <div id="requestsContainer" class="space-y-3 max-h-[650px] overflow-y-auto custom-scrollbar">
-            <div class="text-center py-12 text-gray-400" id="emptyView">
-                <i class="fa-solid fa-inbox text-4xl mb-3 opacity-40"></i>
-                <p class="text-lg">Wala pang kahilingan</p>
-                <p class="text-sm">Kapag may nagsumite, lalabas dito</p>
+        <div class="glass-card p-4">
+            <div id="requestsContainer" class="space-y-3 max-h-[650px] overflow-y-auto custom-scrollbar">
+                <div class="text-center py-12 text-gray-400">
+                    <div class="loading-spinner mx-auto mb-3"></div>
+                    <p class="text-lg">Kasalukuyang kinukuha ang data...</p>
+                </div>
             </div>
         </div>
     </div>
@@ -351,162 +320,208 @@
 
 
 <script>
-    // === DEFAULT ACCOUNT ===
-    const ADMIN_USER = "admin";
-    const ADMIN_PASS = "admin123";
+// =====================================================
+// ✅ KONFIGURASYON NG FIREBASE — ILAGAY MO ANG IYONG DATA DITO
+// =====================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyCkH8xQH_XXXXXXXXXXXXXXXXXXXX",
+  authDomain: "clinic-request-system.firebaseapp.com",
+  projectId: "clinic-request-system",
+  storageBucket: "clinic-request-system.appspot.com",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abcdef1234567890abcdef"
+};
 
-    // === DATA STORAGE ===
-    let allRequests = JSON.parse(localStorage.getItem('clinicRequestsV2') || '[]');
-    let activeTab = 'pending';
+// === PAGSIMULA NG FIREBASE ===
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-    // === PAGE SWITCH ===
-    function switchPage(pageId) {
-        document.querySelectorAll('.page').forEach(p => {
-            p.classList.remove('active');
-            p.style.opacity = '0';
-        });
-        setTimeout(() => {
-            document.getElementById(pageId).classList.add('active');
-            window.scrollTo(0,0);
-            if (pageId === 'adminPage') renderRequests();
-        }, 50);
-    }
+// === DEFAULT ACCOUNT ===
+const ADMIN_USER = "admin";
+const ADMIN_PASS = "admin123";
 
-    // === ADMIN LOGIN ===
-    function doAdminLogin() {
-        const u = document.getElementById('adminUser').value.trim();
-        const p = document.getElementById('adminPass').value.trim();
-        if (u === ADMIN_USER && p === ADMIN_PASS) {
-            switchPage('adminPage');
-        } else {
-            const loginCard = document.querySelector('#loginPage .glass-card');
-            loginCard.classList.add('shake');
-            setTimeout(() => loginCard.classList.remove('shake'), 400);
-            alert('❌ Maling Username o Password!');
+let allRequests = [];
+let activeTab = 'pending';
+let unsubscribe = null; // Para sa real-time updates
+
+// === PAGE SWITCH ===
+function switchPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => {
+        p.classList.remove('active');
+        p.style.opacity = '0';
+    });
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    setTimeout(() => {
+        document.getElementById(pageId).classList.add('active');
+        if (pageId === 'adminPage') {
+            listenToRequests(); // Simulan ang real-time na pakikinig
         }
-    }
+    }, 50);
+}
 
-    // === BACK TO LOGIN ===
-    function logoutBack() {
-        document.getElementById('adminUser').value = '';
-        document.getElementById('adminPass').value = '';
-        switchPage('loginPage');
-    }
-
-    // === SHOW/HIDE CUSTOM FIELDS ===
-    document.getElementById('concernSelect').addEventListener('change', function() {
-        document.getElementById('customConcernWrapper').classList.toggle('hidden', this.value !== 'Iba pa');
-    });
-    document.getElementById('locationSelect').addEventListener('change', function() {
-        document.getElementById('customLocationWrapper').classList.toggle('hidden', this.value !== 'Iba pa');
-    });
-
-    // === SAVE DATA ===
-    function saveData() {
-        localStorage.setItem('clinicRequestsV2', JSON.stringify(allRequests));
-    }
-
-    // === UPDATE COUNTERS ===
-    function updateCounters() {
-        document.getElementById('pendingCount').textContent = allRequests.filter(r => r.status === 'pending').length;
-        document.getElementById('progressCount').textContent = allRequests.filter(r => r.status === 'processing').length;
-        document.getElementById('doneCount').textContent = allRequests.filter(r => r.status === 'done').length;
-    }
-
-    // === ESCAPE HTML ===
-    function escapeHtml(text) {
-        if (!text) return '';
-        return text.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-    }
-
-    // === RENDER REQUESTS BY TAB ===
-    function renderRequests() {
-        const container = document.getElementById('requestsContainer');
-        const filtered = allRequests.filter(r => r.status === activeTab);
-
-        if (filtered.length === 0) {
-            container.innerHTML = `
-                <div class="text-center py-12 text-gray-400">
-                    <i class="fa-solid fa-inbox text-4xl mb-3 opacity-40"></i>
-                    <p class="text-lg">Walang kahilingan sa kategoryang ito</p>
-                    <p class="text-sm">Lalabas dito kapag may ${activeTab === 'pending' ? 'ipinadalang' : activeTab === 'processing' ? 'inasikaso nang' : 'tapos nang'} kahilingan</p>
+// === REAL-TIME LISTENER — Lalabas AGAD kapag may nai-sumite ===
+function listenToRequests() {
+    if (unsubscribe) unsubscribe(); // Iwas dobleng listener
+    
+    unsubscribe = db.collection('requests')
+        .orderBy('submittedAt', 'desc')
+        .onSnapshot(snapshot => {
+            allRequests = snapshot.docs.map(doc => ({
+                uid: doc.id,
+                ...doc.data()
+            }));
+            renderRequests();
+            // Tunog kapag may bagong kahilingan
+            if (snapshot.docChanges().some(change => change.type === 'added')) {
+                document.getElementById('alertTone').currentTime = 0;
+                document.getElementById('alertTone').play().catch(() => {});
+            }
+        }, error => {
+            console.error("Firebase Error:", error);
+            document.getElementById('requestsContainer').innerHTML = `
+                <div class="text-center py-12 text-red-400">
+                    <i class="fa-solid fa-triangle-exclamation text-4xl mb-3"></i>
+                    <p class="text-lg">May problema sa pagkuha ng data</p>
+                    <p class="text-sm">Siguraduhing tama ang Firebase configuration</p>
                 </div>`;
-            updateCounters();
-            return;
-        }
-
-        const statusStyle = {
-            pending: { border:'border-medblue-500', bg:'bg-medblue-50', label:'Nakabinbin' },
-            processing: { border:'border-medamber-500', bg:'bg-medamber-50', label:'Inaasikaso' },
-            done: { border:'border-medgreen-500', bg:'bg-medgreen-50', label:'Tapos na' }
-        };
-
-        container.innerHTML = '';
-        filtered.forEach((req, idx) => {
-            const st = statusStyle[req.status];
-            const sevClass = req.severity === 'Mahina' ? 'bg-green-100 text-green-800' : req.severity === 'Katamtaman' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800';
-
-            const card = document.createElement('div');
-            card.className = `req-card p-4 ${st.bg} border-l-4 scale-in`;
-            card.style.animationDelay = `${idx * 0.07}s`;
-            card.innerHTML = `
-                <div class="flex justify-between items-start mb-3">
-                    <h4 class="font-bold text-lg text-gray-800">${escapeHtml(req.name)}</h4>
-                    <span class="text-xs font-bold px-3 py-1 rounded-full ${st.bg} border ${st.border.replace('border-','border-opacity-40 border-')}">${st.label}</span>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                    <p><strong>Katungkulan:</strong> ${escapeHtml(req.role)} ${req.id ? `(${escapeHtml(req.id)})` : ''}</p>
-                    <p><strong>Kurso at Taon:</strong> ${escapeHtml(req.courseYear)}</p>
-                    <p class="sm:col-span-2"><strong>Lokasyon:</strong> ${escapeHtml(req.location)}</p>
-                    <p class="sm:col-span-2"><strong>Dahilan:</strong> ${escapeHtml(req.concern)}${req.customConcern ? ` → ${escapeHtml(req.customConcern)}` : ''}</p>
-                    <p><strong>Antas ng Sakit:</strong> <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${sevClass}">${req.severity}</span></p>
-                    <p class="text-gray-500 text-xs">🕒 ${req.time}</p>
-                </div>
-                <div class="flex flex-wrap gap-2 mt-3 pt-2 border-t border-gray-200/50">
-                    ${req.status === 'pending' ? `<button onclick="changeStatus('${req.uid}','processing')" class="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg font-medium hover:bg-amber-200 transition"><i class="fa-solid fa-ellipsis"></i> Inaasikaso</button>` : ''}
-                    ${req.status !== 'done' ? `<button onclick="changeStatus('${req.uid}','done')" class="text-xs px-3 py-1.5 bg-green-100 text-green-800 rounded-lg font-medium hover:bg-green-200 transition"><i class="fa-solid fa-check"></i> Tapos na</button>` : ''}
-                    <button onclick="deleteReq('${req.uid}')" class="text-xs px-3 py-1.5 bg-red-50 text-red-700 rounded-lg font-medium hover:bg-red-100 transition ml-auto"><i class="fa-solid fa-trash"></i> Burahin</button>
-                </div>
-            `;
-            container.prepend(card);
         });
+}
 
+// === ADMIN LOGIN ===
+function doAdminLogin() {
+    const u = document.getElementById('adminUser').value.trim();
+    const p = document.getElementById('adminPass').value.trim();
+    if (u === ADMIN_USER && p === ADMIN_PASS) {
+        switchPage('adminPage');
+    } else {
+        const loginCard = document.querySelector('#loginPage .glass-card');
+        loginCard.classList.add('shake');
+        setTimeout(() => loginCard.classList.remove('shake'), 400);
+        alert('❌ Maling Username o Password!');
+    }
+}
+
+// === BACK TO LOGIN ===
+function logoutBack() {
+    if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+    document.getElementById('adminUser').value = '';
+    document.getElementById('adminPass').value = '';
+    switchPage('loginPage');
+}
+
+// === SHOW/HIDE CUSTOM FIELDS ===
+document.getElementById('concernSelect').addEventListener('change', function() {
+    document.getElementById('customConcernWrapper').classList.toggle('hidden', this.value !== 'Iba pa');
+});
+document.getElementById('locationSelect').addEventListener('change', function() {
+    document.getElementById('customLocationWrapper').classList.toggle('hidden', this.value !== 'Iba pa');
+});
+
+// === UPDATE COUNTERS ===
+function updateCounters() {
+    document.getElementById('pendingCount').textContent = allRequests.filter(r => r.status === 'pending').length;
+    document.getElementById('progressCount').textContent = allRequests.filter(r => r.status === 'processing').length;
+    document.getElementById('doneCount').textContent = allRequests.filter(r => r.status === 'done').length;
+}
+
+// === ESCAPE HTML ===
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+// === RENDER REQUESTS ===
+function renderRequests() {
+    const container = document.getElementById('requestsContainer');
+    const filtered = allRequests.filter(r => r.status === activeTab);
+    
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12 text-gray-400">
+                <i class="fa-solid fa-inbox text-4xl mb-3 opacity-40"></i>
+                <p class="text-lg">Walang kahilingan sa kategoryang ito</p>
+                <p class="text-sm">Lalabas dito kapag may ${activeTab === 'pending' ? 'ipinadalang' : activeTab === 'processing' ? 'inasikaso nang' : 'tapos nang'} kahilingan</p>
+            </div>`;
         updateCounters();
+        return;
     }
 
-    // === TAB SWITCHING ===
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            activeTab = btn.dataset.tab;
-            renderRequests();
-        });
+    const statusStyle = {
+        pending: { border:'border-medblue-500', bg:'bg-medblue-50', label:'Nakabinbin' },
+        processing: { border:'border-medamber-500', bg:'bg-medamber-50', label:'Inaasikaso' },
+        done: { border:'border-medgreen-500', bg:'bg-medgreen-50', label:'Tapos na' }
+    };
+
+    container.innerHTML = '';
+    filtered.forEach((req, idx) => {
+        const st = statusStyle[req.status];
+        const sevClass = req.severity === 'Mahina' ? 'bg-green-100 text-green-800' : req.severity === 'Katamtaman' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800';
+        const card = document.createElement('div');
+        card.className = `req-card p-4 ${st.bg} border-l-4 scale-in`;
+        card.style.animationDelay = `${idx * 0.07}s`;
+        card.innerHTML = `
+            <div class="flex justify-between items-start mb-3">
+                <h4 class="font-bold text-lg text-gray-800">${escapeHtml(req.name)}</h4>
+                <span class="text-xs font-bold px-3 py-1 rounded-full ${st.bg} border ${st.border.replace('border-','border-opacity-40 border-')}">${st.label}</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <p><strong>Katungkulan:</strong> ${escapeHtml(req.role)} ${req.id ? `(${escapeHtml(req.id)})` : ''}</p>
+                <p><strong>Kurso at Taon:</strong> ${escapeHtml(req.courseYear)}</p>
+                <p class="sm:col-span-2"><strong>Lokasyon:</strong> ${escapeHtml(req.location)}</p>
+                <p class="sm:col-span-2"><strong>Dahilan:</strong> ${escapeHtml(req.concern)}${req.customConcern ? ` → ${escapeHtml(req.customConcern)}` : ''}</p>
+                <p><strong>Antas ng Sakit:</strong> <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${sevClass}">${req.severity}</span></p>
+                <p class="text-gray-500 text-xs">🕒 ${req.time}</p>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-3 pt-2 border-t border-gray-200/50">
+                ${req.status === 'pending' ? `<button onclick="changeStatus('${req.uid}','processing')" class="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg font-medium hover:bg-amber-200 transition"><i class="fa-solid fa-ellipsis"></i> Inaasikaso</button>` : ''}
+                ${req.status !== 'done' ? `<button onclick="changeStatus('${req.uid}','done')" class="text-xs px-3 py-1.5 bg-green-100 text-green-800 rounded-lg font-medium hover:bg-green-200 transition"><i class="fa-solid fa-check"></i> Tapos na</button>` : ''}
+                <button onclick="deleteReq('${req.uid}')" class="text-xs px-3 py-1.5 bg-red-50 text-red-700 rounded-lg font-medium hover:bg-red-100 transition ml-auto"><i class="fa-solid fa-trash"></i> Burahin</button>
+            </div>
+        `;
+        container.appendChild(card);
     });
+    updateCounters();
+}
 
-    // === CHANGE STATUS ===
-    function changeStatus(uid, newStatus) {
-        const req = allRequests.find(r => r.uid === uid);
-        if (req) {
-            req.status = newStatus;
-            saveData();
-            renderRequests();
+// === TAB SWITCHING ===
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeTab = btn.dataset.tab;
+        renderRequests();
+    });
+});
+
+// === CHANGE STATUS — I-save sa Firebase ===
+async function changeStatus(uid, newStatus) {
+    try {
+        await db.collection('requests').doc(uid).update({ status: newStatus });
+    } catch (e) {
+        alert('❌ Nabigo ang pag-update: ' + e.message);
+    }
+}
+
+// === DELETE REQUEST ===
+async function deleteReq(uid) {
+    if (confirm('Burahin ba talaga ang kahilingang ito?')) {
+        try {
+            await db.collection('requests').doc(uid).delete();
+        } catch (e) {
+            alert('❌ Nabigo ang pagbura: ' + e.message);
         }
     }
+}
 
-    // === DELETE REQUEST ===
-    function deleteReq(uid) {
-        if (confirm('Burahin ba talaga ang kahilingang ito?')) {
-            allRequests = allRequests.filter(r => r.uid !== uid);
-            saveData();
-            renderRequests();
-        }
-    }
+// === FORM SUBMISSION — Ipadala sa Firebase ===
+document.getElementById('visitForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner mr-2"></span> Ipinapadala...';
 
-    // === FORM SUBMISSION ===
-    document.getElementById('visitForm').addEventListener('submit', e => {
-        e.preventDefault();
-
+    try {
         // Get values
         let concern = document.getElementById('concernSelect').value;
         const customConcern = concern === 'Iba pa' ? document.getElementById('customConcernText').value.trim() : '';
@@ -514,12 +529,9 @@
         const customLocation = location === 'Iba pa' ? document.getElementById('customLocationText').value.trim() : '';
         if (location === 'Iba pa' && customLocation) location = customLocation;
         if (concern === 'Iba pa' && customConcern) concern = customConcern;
-
         const severity = document.querySelector('input[name="severity"]:checked')?.value || 'Katamtaman';
 
-        // Validation
         const formData = {
-            uid: 'REQ-' + Date.now(),
             name: document.getElementById('fullname').value.trim(),
             role: document.getElementById('role').value,
             id: document.getElementById('idNumber').value.trim(),
@@ -529,37 +541,41 @@
             customConcern,
             severity,
             time: new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', hour12:true}),
-            status: 'pending'
+            status: 'pending',
+            submittedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
+        // Validation
         if (!formData.name || !formData.role || !formData.courseYear || !formData.location || !formData.concern) {
             alert('❌ Punan ang lahat ng kinakailangang patlang!');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
             return;
         }
 
-        // Save
-        allRequests.push(formData);
-        saveData();
+        // I-save sa Firebase
+        await db.collection('requests').add(formData);
 
-        // Notification & Sound
+        // Notification
         document.getElementById('alertTone').currentTime = 0;
         document.getElementById('alertTone').play().catch(() => {});
-        const toast = document.getElementById('toastPopup');
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 4500);
+        document.getElementById('toastPopup').classList.add('show');
+        setTimeout(() => document.getElementById('toastPopup').classList.remove('show'), 4500);
 
         // Reset form
         e.target.reset();
         document.getElementById('customConcernWrapper').classList.add('hidden');
         document.getElementById('customLocationWrapper').classList.add('hidden');
-
         alert('✅ Naipadala na sa Clinic! Maraming Salamat!');
-    });
 
-    // Load saved data on start
-    window.onload = () => {
-        allRequests = JSON.parse(localStorage.getItem('clinicRequestsV2') || '[]');
-    };
+    } catch (error) {
+        alert('❌ Nabigo ang pagpapadala: ' + error.message + '\nSiguraduhing tama ang Firebase configuration.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+
 </script>
 </body>
 </html>

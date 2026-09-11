@@ -3,579 +3,941 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clinic Visit Request System</title>
+    <title>Clinic Appointment System</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
     
-    <!-- === FIREBASE BACKEND (LIBRE) === -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        medblue: { 50:'#eff6ff', 100:'#dbeafe', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 800:'#1e40af' },
-                        medgreen: { 50:'#f0fdf4', 100:'#dcfce7', 500:'#22c55e', 600:'#16a34a', 700:'#15803d' },
-                        medamber: { 50:'#fffbeb', 100:'#fef3c7', 500:'#f59e0b', 600:'#d97706' },
-                        medred: { 50:'#fef2f2', 100:'#fee2e2', 500:'#ef4444', 600:'#dc2626' }
+                        primary: '#2563eb',
+                        secondary: '#10b981',
+                        accent: '#f59e0b',
+                        light: '#f1f5f9',
+                        dark: '#1e293b',
+                        danger: '#ef4444',
                     },
-                    boxShadow: {
-                        'luxury': '0 20px 60px -15px rgba(37,99,235,0.25)',
-                        'soft': '0 10px 30px rgba(0,0,0,0.08)',
-                        'glow': '0 0 25px rgba(34,197,94,0.25)'
-                    }
+                    fontFamily: {
+                        sans: ['Inter', 'Segoe UI', 'sans-serif'],
+                    },
                 }
             }
         }
     </script>
-    <style>
-        html, body {
-            background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            scroll-behavior: smooth;
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .card-shadow {
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            }
+            .sidebar-link {
+                @apply flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 hover:bg-primary/10 hover:text-primary;
+            }
+            .sidebar-link.active {
+                @apply bg-primary/10 text-primary font-medium;
+            }
+            .form-input {
+                @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
+            }
+            .btn {
+                @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+            }
+            .btn-primary {
+                @apply bg-primary text-white hover:bg-primary/90;
+            }
+            .btn-secondary {
+                @apply bg-secondary text-white hover:bg-secondary/90;
+            }
+            .btn-danger {
+                @apply bg-danger text-white hover:bg-danger/90;
+            }
+            .btn-outline {
+                @apply border border-primary text-primary hover:bg-primary/5;
+            }
+            .tab-btn {
+                @apply px-4 py-2 border-b-2 border-transparent transition-all hover:bg-gray-50;
+            }
+            .tab-btn.active {
+                @apply border-primary text-primary font-medium;
+            }
+            .slot-btn {
+                @apply px-3 py-2 border rounded-lg text-center transition-all;
+            }
+            .slot-btn.available {
+                @apply border-secondary text-secondary hover:bg-secondary/10 cursor-pointer;
+            }
+            .slot-btn.unavailable {
+                @apply border-gray-300 text-gray-400 cursor-not-allowed;
+            }
+            .slot-btn.selected {
+                @apply bg-primary text-white border-primary;
+            }
         }
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes scaleIn {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes slideInRight {
-            from { opacity: 0; transform: translateX(40px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes pulseSoft {
-            0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
-            50% { box-shadow: 0 0 0 12px rgba(34,197,94,0); }
-        }
-        @keyframes shake {
-            0%,100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-        .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; opacity:0; }
-        .scale-in { animation: scaleIn 0.5s ease-out forwards; opacity:0; }
-        .slide-in-right { animation: slideInRight 0.5s ease-out forwards; opacity:0; }
-        .pulse-soft { animation: pulseSoft 2s infinite; }
-        .shake { animation: shake 0.4s ease-in-out; }
-        .page { 
-            display: none; 
-            opacity: 0; 
-            transition: opacity 0.4s ease;
-            min-height: 100vh;
-            overflow-y: auto;
-        }
-        .page.active { 
-            display: flex; 
-            opacity: 1; 
-            animation: fadeInUp 0.5s ease-out forwards;
-        }
-        .glass-card {
-            background: rgba(255,255,255,0.88);
-            backdrop-filter: blur(20px);
-            border-radius: 24px;
-            border: 1px solid rgba(255,255,255,0.7);
-            box-shadow: 0 20px 60px -15px rgba(37,99,235,0.2);
-            transition: all 0.4s ease;
-        }
-        .glass-card:hover { transform: translateY(-5px); box-shadow: 0 25px 50px -12px rgba(37,99,235,0.18); }
-        .input-field {
-            border-radius: 14px;
-            border: 2px solid #e5e7eb;
-            transition: all 0.3s ease;
-        }
-        .input-field:focus {
-            border-color: #2563eb;
-            box-shadow: 0 0 0 6px rgba(37,99,235,0.1);
-            outline: none;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-            border-radius: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 15px 35px -10px rgba(37,99,235,0.35); }
-        .btn-primary:active { transform: translateY(0); }
-        .btn-admin { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); }
-        .tab-btn {
-            transition: all 0.3s ease;
-            border-bottom: 3px solid transparent;
-        }
-        .tab-btn.active {
-            border-bottom-color: #2563eb;
-            background: rgba(37,99,235,0.08);
-            color: #1d4ed8;
-            font-weight: 600;
-        }
-        .tab-btn:hover:not(.active) { background: rgba(0,0,0,0.03); border-bottom-color: #ddd; }
-        .req-card {
-            border-radius: 16px;
-            border-left: 5px solid;
-            transition: all 0.35s ease;
-        }
-        .req-card:hover { transform: scale(1.015); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
-        .toast {
-            transform: translateX(120%);
-            transition: transform 0.5s cubic-bezier(0.16,1,0.3,1);
-        }
-        .toast.show { transform: translateX(0); }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #bfdbfe; border-radius: 10px; }
-        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body>
-
-<!-- ============== LOGIN PAGE ============== -->
-<div id="loginPage" class="page active items-center justify-center px-4">
-    <div class="glass-card p-8 w-full max-w-md scale-in my-8">
-        <div class="text-center mb-8">
-            <div class="w-16 h-16 rounded-2xl bg-medblue-100 flex items-center justify-center text-medblue-700 mx-auto mb-3 pulse-soft">
-                <i class="fa-solid fa-heart-pulse text-3xl"></i>
+<body class="bg-gray-50 text-dark font-sans min-h-screen">
+    <div id="app" class="flex flex-col md:flex-row min-h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 p-4 sticky top-0 h-screen">
+            <div class="mb-8 mt-2">
+                <h1 class="text-xl font-bold text-primary flex items-center gap-2">
+                    <i class="fa fa-heartbeat"></i>
+                    <span>Clinic App</span>
+                </h1>
+                <p class="text-sm text-gray-500 mt-1">Appointment System</p>
             </div>
-            <h1 class="text-2xl font-bold text-gray-800">Clinic Visit Request System</h1>
-            <p class="text-gray-500 mt-1">Pumili ng uri ng pag-access</p>
-        </div>
-        <div class="mb-6">
-            <h3 class="text-sm font-semibold text-gray-600 mb-3">👤 Estudyante / Guro</h3>
-            <button onclick="switchPage('userPage')" class="btn-primary w-full py-3.5 text-white font-semibold">
-                <i class="fa-solid fa-file-pen mr-2"></i> Pumunta sa Form
-            </button>
-        </div>
-        <div class="border-t pt-6">
-            <h3 class="text-sm font-semibold text-gray-600 mb-3">🏥 Nurse / Admin</h3>
-            <div class="space-y-3">
-                <input type="text" id="adminUser" placeholder="Username" class="w-full px-4 py-3 input-field">
-                <input type="password" id="adminPass" placeholder="Password" class="w-full px-4 py-3 input-field">
-                <button onclick="doAdminLogin()" class="btn-primary btn-admin w-full py-3 text-white font-semibold">
-                    <i class="fa-solid fa-shield-halved mr-2"></i> Mag-Login bilang Nurse
+            
+            <nav id="sidebar-nav" class="flex-1 space-y-1">
+                <!-- Navigation links will be inserted dynamically -->
+            </nav>
+            
+            <div id="user-area" class="mt-auto pt-4 border-t border-gray-200">
+                <div id="user-info" class="hidden mb-3">
+                    <p class="font-medium text-sm" id="user-name"></p>
+                    <p class="text-xs text-gray-500" id="user-role"></p>
+                </div>
+                <button id="logout-btn" class="sidebar-link text-gray-600 hidden">
+                    <i class="fa fa-sign-out"></i>
+                    <span>Log Out</span>
                 </button>
             </div>
-            <p class="text-xs text-gray-400 mt-2 text-center">Default: <b>admin</b> / <b>admin123</b></p>
-        </div>
-    </div>
-</div>
-
-<!-- ============== USER / FORM PAGE ============== -->
-<div id="userPage" class="page items-start justify-center px-4 py-6">
-    <div class="w-full max-w-2xl mx-auto">
-        <div class="flex justify-between items-center mb-6 slide-in-right">
-            <div>
-                <h2 class="text-xl font-bold text-medblue-800">📝 Clinic Visit Request Form</h2>
-                <p class="text-sm text-gray-500">Punan ang impormasyon bago pumunta sa clinic</p>
-            </div>
-            <button onclick="logoutBack()" class="text-sm text-red-500 hover:text-red-700 transition-colors">
-                <i class="fa-solid fa-arrow-left mr-1"></i> Bumalik
-            </button>
-        </div>
-        <div class="glass-card p-6 fade-in-up">
-            <form id="visitForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Buong Pangalan <span class="text-medred-500">*</span></label>
-                    <input type="text" id="fullname" placeholder="Ipasok ang iyong buong pangalan" class="w-full px-4 py-3 input-field" required>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Katungkulan <span class="text-medred-500">*</span></label>
-                        <select id="role" class="w-full px-4 py-3 input-field" required>
-                            <option value="">Pumili...</option>
-                            <option value="Estudyante">Estudyante</option>
-                            <option value="Guro">Guro / Pangkatan</option>
-                            <option value="Staff">Empleyado</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">ID Bilang</label>
-                        <input type="text" id="idNumber" placeholder="ID bilang (opsyonal)" class="w-full px-4 py-3 input-field">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Kurso at Taon / Antas <span class="text-medred-500">*</span></label>
-                    <input type="text" id="courseYear" placeholder="Hal. BSIT 2nd Year / Grade 10" class="w-full px-4 py-3 input-field" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Kasalukuyang Lokasyon <span class="text-medred-500">*</span></label>
-                    <select id="locationSelect" class="w-full px-4 py-3 input-field" required>
-                        <option value="">Saan ka naroroon?</option>
-                        <option value="Silid-aralan">Silid-aralan</option>
-                        <option value="Paaralan / Opisina">Opisina ng Paaralan</option>
-                        <option value="Canteen / Kantina">Kantina</option>
-                        <option value="Gym / Bulwagan">Gym o Bulwagan</option>
-                        <option value="Lab / Silid-kasanayan">Laboratoryo</option>
-                        <option value="Labas ng Paaralan">Labas ng Paaralan</option>
-                        <option value="Iba pa">Iba pa — ilarawan</option>
-                    </select>
-                </div>
-                <div id="customLocationWrapper" class="hidden mt-2">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Ilarawan ang lokasyon</label>
-                    <input type="text" id="customLocationText" placeholder="Hal. Sa gusali ng Agham, 2nd Palapag" class="w-full px-4 py-3 input-field">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Dahilan ng Pagpunta sa Clinic <span class="text-medred-500">*</span></label>
-                    <select id="concernSelect" class="w-full px-4 py-3 input-field" required>
-                        <option value="">Pumili ng dahilan...</option>
-                        <option value="Sakit ng Ulo / Pagkahilo">🤕 Sakit ng Ulo / Pagkahilo</option>
-                        <option value="Lagnat / Panginginig">🤒 Lagnat / Panginginig</option>
-                        <option value="Ubo, Sipon o Sakit ng Lalamunan">😷 Ubo, Sipon o Sakit ng Lalamunan</option>
-                        <option value="Sakit ng Tiyan / Pagkahilo">🫃 Sakit ng Tiyan / Pagkahilo</option>
-                        <option value="Sugat, Pilay o Pinsala">🤕 Sugat, Pilay o Pinsala</option>
-                        <option value="Pananakit ng Katawan / Kalamnan">💪 Pananakit ng Katawan o Kalamnan</option>
-                        <option value="Humihingi ng Gamot / Paunang Lunas">💊 Humihingi ng Gamot / Paunang Lunas</option>
-                        <option value="Pangkalahatang Pagsusuri / Pahinga">🏥 Pangkalahatang Pagsusuri / Pahinga</option>
-                        <option value="Iba pa">📝 Iba pa — ilarawan sa ibaba</option>
-                    </select>
-                </div>
-                <div id="customConcernWrapper" class="hidden mt-2">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Ilarawan ang iyong hinaing</label>
-                    <textarea id="customConcernText" rows="3" placeholder="I-type dito ang iyong kalusugang hinaing..." class="w-full px-4 py-3 input-field"></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Antas ng Sakit o Pagkahilo</label>
-                    <div class="flex flex-wrap gap-3">
-                        <label class="flex-1 min-w-[90px] cursor-pointer">
-                            <input type="radio" name="severity" value="Mahina" class="hidden peer">
-                            <div class="px-3 py-3 rounded-xl border-2 border-gray-200 text-center transition-all peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-800 peer-checked:font-semibold">😊 Mahina</div>
-                        </label>
-                        <label class="flex-1 min-w-[90px] cursor-pointer">
-                            <input type="radio" name="severity" value="Katamtaman" class="hidden peer" checked>
-                            <div class="px-3 py-3 rounded-xl border-2 border-gray-200 text-center transition-all peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-800 peer-checked:font-semibold">😐 Katamtaman</div>
-                        </label>
-                        <label class="flex-1 min-w-[90px] cursor-pointer">
-                            <input type="radio" name="severity" value="Malala" class="hidden peer">
-                            <div class="px-3 py-3 rounded-xl border-2 border-gray-200 text-center transition-all peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-800 peer-checked:font-semibold">😣 Malala</div>
-                        </label>
-                    </div>
-                </div>
-                <button type="submit" id="submitBtn" class="btn-primary w-full py-3.5 text-white font-semibold mt-4">
-                    <i class="fa-solid fa-paper-plane mr-2"></i> Ipadala sa Clinic Nurse
+        </aside>
+        <!-- Main Content -->
+        <main class="flex-1 p-4 md:p-6">
+            <!-- Mobile Header -->
+            <div class="md:hidden flex justify-between items-center mb-6">
+                <h1 class="text-xl font-bold text-primary flex items-center gap-2">
+                    <i class="fa fa-heartbeat"></i>
+                    <span>Clinic Appointment</span>
+                </h1>
+                <button id="mobile-menu-btn" class="text-dark p-2">
+                    <i class="fa fa-bars"></i>
                 </button>
-            </form>
-        </div>
+            </div>
+            <!-- Page Content -->
+            <div id="page-content" class="max-w-5xl mx-auto">
+                <!-- Content loads here dynamically -->
+            </div>
+        </main>
     </div>
-</div>
-
-<!-- ============== NURSE / ADMIN DASHBOARD ============== -->
-<div id="adminPage" class="page items-start justify-center px-4 py-6">
-    <div class="w-full max-w-4xl mx-auto">
-        <div class="flex justify-between items-center mb-6">
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-white rounded-lg card-shadow p-4 max-w-sm transform translate-y-100 opacity-0 transition-all duration-300 z-50 pointer-events-none">
+        <div class="flex items-start gap-3">
+            <i id="toast-icon" class="fa fa-check-circle text-xl text-secondary"></i>
             <div>
-                <h2 class="text-xl font-bold text-medgreen-700">🏥 Nurse Dashboard</h2>
-                <p class="text-sm text-gray-500">Pamahalaan ang mga kahilingan ng pagpunta sa clinic</p>
-            </div>
-            <button onclick="logoutBack()" class="text-sm text-red-500 hover:text-red-700 transition-colors">
-                <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Mag-Logout
-            </button>
-        </div>
-        <div class="grid grid-cols-3 gap-3 mb-6">
-            <div class="bg-medblue-50 rounded-xl p-4 text-center scale-in" style="animation-delay:0.1s;">
-                <p class="text-xs text-medblue-600 font-medium">Nakabinbin</p>
-                <p class="text-2xl font-bold text-medblue-800" id="pendingCount">0</p>
-            </div>
-            <div class="bg-medamber-50 rounded-xl p-4 text-center scale-in" style="animation-delay:0.2s;">
-                <p class="text-xs text-medamber-600 font-medium">Inaasikaso</p>
-                <p class="text-2xl font-bold text-amber-700" id="progressCount">0</p>
-            </div>
-            <div class="bg-medgreen-50 rounded-xl p-4 text-center scale-in" style="animation-delay:0.3s;">
-                <p class="text-xs text-green-600 font-medium">Tapos na</p>
-                <p class="text-2xl font-bold text-green-700" id="doneCount">0</p>
-            </div>
-        </div>
-        <div class="flex flex-wrap mb-4 bg-white rounded-xl shadow-sm overflow-hidden">
-            <button class="tab-btn active flex-1 py-3 px-4 text-sm" data-tab="pending">⏳ Nakabinbin</button>
-            <button class="tab-btn flex-1 py-3 px-4 text-sm" data-tab="processing">🔄 Inaasikaso</button>
-            <button class="tab-btn flex-1 py-3 px-4 text-sm" data-tab="done">✅ Tapos na</button>
-        </div>
-        <div class="glass-card p-4">
-            <div id="requestsContainer" class="space-y-3 max-h-[650px] overflow-y-auto custom-scrollbar">
-                <div class="text-center py-12 text-gray-400">
-                    <div class="loading-spinner mx-auto mb-3"></div>
-                    <p class="text-lg">Kasalukuyang kinukuha ang data...</p>
-                </div>
+                <h4 id="toast-title" class="font-medium">Success</h4>
+                <p id="toast-message" class="text-sm text-gray-600 mt-1"></p>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Toast Notification -->
-<div id="toastPopup" class="toast fixed top-5 right-5 bg-white p-4 rounded-xl border-l-4 border-medgreen-500 shadow-xl z-50 flex items-center gap-3">
-    <div class="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-lg">
-        <i class="fa-solid fa-circle-check"></i>
-    </div>
-    <div>
-        <h4 class="font-bold text-gray-800">Matagumpay na Naipadala!</h4>
-        <p class="text-sm text-gray-500">Natanggap na ng Nurse ang iyong kahilingan</p>
-    </div>
-</div>
-
-<!-- Alert Sound -->
-<audio id="alertTone" preload="auto">
-    <source src="https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3" type="audio/mpeg">
-
-
-<script>
-// =====================================================
-// ✅ KONFIGURASYON NG FIREBASE — ILAGAY MO ANG IYONG DATA DITO
-// =====================================================
-const firebaseConfig = {
-  apiKey: "AIzaSyCkH8xQH_XXXXXXXXXXXXXXXXXXXX",
-  authDomain: "clinic-request-system.firebaseapp.com",
-  projectId: "clinic-request-system",
-  storageBucket: "clinic-request-system.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abcdef1234567890abcdef"
-};
-
-// === PAGSIMULA NG FIREBASE ===
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-
-// === DEFAULT ACCOUNT ===
-const ADMIN_USER = "admin";
-const ADMIN_PASS = "admin123";
-
-let allRequests = [];
-let activeTab = 'pending';
-let unsubscribe = null; // Para sa real-time updates
-
-// === PAGE SWITCH ===
-function switchPage(pageId) {
-    document.querySelectorAll('.page').forEach(p => {
-        p.classList.remove('active');
-        p.style.opacity = '0';
-    });
-    window.scrollTo({ top: 0, behavior: 'instant' });
-    setTimeout(() => {
-        document.getElementById(pageId).classList.add('active');
-        if (pageId === 'adminPage') {
-            listenToRequests(); // Simulan ang real-time na pakikinig
-        }
-    }, 50);
-}
-
-// === REAL-TIME LISTENER — Lalabas AGAD kapag may nai-sumite ===
-function listenToRequests() {
-    if (unsubscribe) unsubscribe(); // Iwas dobleng listener
-    
-    unsubscribe = db.collection('requests')
-        .orderBy('submittedAt', 'desc')
-        .onSnapshot(snapshot => {
-            allRequests = snapshot.docs.map(doc => ({
-                uid: doc.id,
-                ...doc.data()
-            }));
-            renderRequests();
-            // Tunog kapag may bagong kahilingan
-            if (snapshot.docChanges().some(change => change.type === 'added')) {
-                document.getElementById('alertTone').currentTime = 0;
-                document.getElementById('alertTone').play().catch(() => {});
-            }
-        }, error => {
-            console.error("Firebase Error:", error);
-            document.getElementById('requestsContainer').innerHTML = `
-                <div class="text-center py-12 text-red-400">
-                    <i class="fa-solid fa-triangle-exclamation text-4xl mb-3"></i>
-                    <p class="text-lg">May problema sa pagkuha ng data</p>
-                    <p class="text-sm">Siguraduhing tama ang Firebase configuration</p>
-                </div>`;
-        });
-}
-
-// === ADMIN LOGIN ===
-function doAdminLogin() {
-    const u = document.getElementById('adminUser').value.trim();
-    const p = document.getElementById('adminPass').value.trim();
-    if (u === ADMIN_USER && p === ADMIN_PASS) {
-        switchPage('adminPage');
-    } else {
-        const loginCard = document.querySelector('#loginPage .glass-card');
-        loginCard.classList.add('shake');
-        setTimeout(() => loginCard.classList.remove('shake'), 400);
-        alert('❌ Maling Username o Password!');
-    }
-}
-
-// === BACK TO LOGIN ===
-function logoutBack() {
-    if (unsubscribe) { unsubscribe(); unsubscribe = null; }
-    document.getElementById('adminUser').value = '';
-    document.getElementById('adminPass').value = '';
-    switchPage('loginPage');
-}
-
-// === SHOW/HIDE CUSTOM FIELDS ===
-document.getElementById('concernSelect').addEventListener('change', function() {
-    document.getElementById('customConcernWrapper').classList.toggle('hidden', this.value !== 'Iba pa');
-});
-document.getElementById('locationSelect').addEventListener('change', function() {
-    document.getElementById('customLocationWrapper').classList.toggle('hidden', this.value !== 'Iba pa');
-});
-
-// === UPDATE COUNTERS ===
-function updateCounters() {
-    document.getElementById('pendingCount').textContent = allRequests.filter(r => r.status === 'pending').length;
-    document.getElementById('progressCount').textContent = allRequests.filter(r => r.status === 'processing').length;
-    document.getElementById('doneCount').textContent = allRequests.filter(r => r.status === 'done').length;
-}
-
-// === ESCAPE HTML ===
-function escapeHtml(text) {
-    if (!text) return '';
-    return text.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-}
-
-// === RENDER REQUESTS ===
-function renderRequests() {
-    const container = document.getElementById('requestsContainer');
-    const filtered = allRequests.filter(r => r.status === activeTab);
-    
-    if (filtered.length === 0) {
-        container.innerHTML = `
-            <div class="text-center py-12 text-gray-400">
-                <i class="fa-solid fa-inbox text-4xl mb-3 opacity-40"></i>
-                <p class="text-lg">Walang kahilingan sa kategoryang ito</p>
-                <p class="text-sm">Lalabas dito kapag may ${activeTab === 'pending' ? 'ipinadalang' : activeTab === 'processing' ? 'inasikaso nang' : 'tapos nang'} kahilingan</p>
-            </div>`;
-        updateCounters();
-        return;
-    }
-
-    const statusStyle = {
-        pending: { border:'border-medblue-500', bg:'bg-medblue-50', label:'Nakabinbin' },
-        processing: { border:'border-medamber-500', bg:'bg-medamber-50', label:'Inaasikaso' },
-        done: { border:'border-medgreen-500', bg:'bg-medgreen-50', label:'Tapos na' }
-    };
-
-    container.innerHTML = '';
-    filtered.forEach((req, idx) => {
-        const st = statusStyle[req.status];
-        const sevClass = req.severity === 'Mahina' ? 'bg-green-100 text-green-800' : req.severity === 'Katamtaman' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800';
-        const card = document.createElement('div');
-        card.className = `req-card p-4 ${st.bg} border-l-4 scale-in`;
-        card.style.animationDelay = `${idx * 0.07}s`;
-        card.innerHTML = `
-            <div class="flex justify-between items-start mb-3">
-                <h4 class="font-bold text-lg text-gray-800">${escapeHtml(req.name)}</h4>
-                <span class="text-xs font-bold px-3 py-1 rounded-full ${st.bg} border ${st.border.replace('border-','border-opacity-40 border-')}">${st.label}</span>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                <p><strong>Katungkulan:</strong> ${escapeHtml(req.role)} ${req.id ? `(${escapeHtml(req.id)})` : ''}</p>
-                <p><strong>Kurso at Taon:</strong> ${escapeHtml(req.courseYear)}</p>
-                <p class="sm:col-span-2"><strong>Lokasyon:</strong> ${escapeHtml(req.location)}</p>
-                <p class="sm:col-span-2"><strong>Dahilan:</strong> ${escapeHtml(req.concern)}${req.customConcern ? ` → ${escapeHtml(req.customConcern)}` : ''}</p>
-                <p><strong>Antas ng Sakit:</strong> <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${sevClass}">${req.severity}</span></p>
-                <p class="text-gray-500 text-xs">🕒 ${req.time}</p>
-            </div>
-            <div class="flex flex-wrap gap-2 mt-3 pt-2 border-t border-gray-200/50">
-                ${req.status === 'pending' ? `<button onclick="changeStatus('${req.uid}','processing')" class="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg font-medium hover:bg-amber-200 transition"><i class="fa-solid fa-ellipsis"></i> Inaasikaso</button>` : ''}
-                ${req.status !== 'done' ? `<button onclick="changeStatus('${req.uid}','done')" class="text-xs px-3 py-1.5 bg-green-100 text-green-800 rounded-lg font-medium hover:bg-green-200 transition"><i class="fa-solid fa-check"></i> Tapos na</button>` : ''}
-                <button onclick="deleteReq('${req.uid}')" class="text-xs px-3 py-1.5 bg-red-50 text-red-700 rounded-lg font-medium hover:bg-red-100 transition ml-auto"><i class="fa-solid fa-trash"></i> Burahin</button>
-            </div>
-        `;
-        container.appendChild(card);
-    });
-    updateCounters();
-}
-
-// === TAB SWITCHING ===
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        activeTab = btn.dataset.tab;
-        renderRequests();
-    });
-});
-
-// === CHANGE STATUS — I-save sa Firebase ===
-async function changeStatus(uid, newStatus) {
-    try {
-        await db.collection('requests').doc(uid).update({ status: newStatus });
-    } catch (e) {
-        alert('❌ Nabigo ang pag-update: ' + e.message);
-    }
-}
-
-// === DELETE REQUEST ===
-async function deleteReq(uid) {
-    if (confirm('Burahin ba talaga ang kahilingang ito?')) {
-        try {
-            await db.collection('requests').doc(uid).delete();
-        } catch (e) {
-            alert('❌ Nabigo ang pagbura: ' + e.message);
-        }
-    }
-}
-
-// === FORM SUBMISSION — Ipadala sa Firebase ===
-document.getElementById('visitForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    const btn = document.getElementById('submitBtn');
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading-spinner mr-2"></span> Ipinapadala...';
-
-    try {
-        // Get values
-        let concern = document.getElementById('concernSelect').value;
-        const customConcern = concern === 'Iba pa' ? document.getElementById('customConcernText').value.trim() : '';
-        let location = document.getElementById('locationSelect').value;
-        const customLocation = location === 'Iba pa' ? document.getElementById('customLocationText').value.trim() : '';
-        if (location === 'Iba pa' && customLocation) location = customLocation;
-        if (concern === 'Iba pa' && customConcern) concern = customConcern;
-        const severity = document.querySelector('input[name="severity"]:checked')?.value || 'Katamtaman';
-
-        const formData = {
-            name: document.getElementById('fullname').value.trim(),
-            role: document.getElementById('role').value,
-            id: document.getElementById('idNumber').value.trim(),
-            courseYear: document.getElementById('courseYear').value.trim(),
-            location,
-            concern,
-            customConcern,
-            severity,
-            time: new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', hour12:true}),
-            status: 'pending',
-            submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+    <script>
+        // =====================================================
+        // 🔧 KAILANGAN I-SETUP ANG FIREBASE — ILAGAY ANG INYONG DATA DITO
+        // =====================================================
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyC5u4Rz5K6Zb8xP9aD7eF3g2h1j0k9l8m7n6b5v4c3x2z1a0",
+            authDomain: "your-clinic-app.firebaseapp.com",
+            projectId: "your-clinic-app",
+            storageBucket: "your-clinic-app.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abc123def456ghi789jkl0"
         };
 
-        // Validation
-        if (!formData.name || !formData.role || !formData.courseYear || !formData.location || !formData.concern) {
-            alert('❌ Punan ang lahat ng kinakailangang patlang!');
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-            return;
+        // =====================================================
+        // CONFIGURATION
+        // =====================================================
+        const BUSINESS_HOURS = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"];
+        const DAYS_AHEAD = 7;
+        const SAMPLE_DOCTORS = [
+            { id: 1, name: "Dr. Ana Reyes", specialty: "General Medicine", email: "doctor@clinic.com", password: "doctor123" },
+            { id: 2, name: "Dr. Juan Dela Cruz", specialty: "Dentistry", email: "dentist@clinic.com", password: "dentist123" }
+        ];
+
+        // =====================================================
+        // 🔥 INITIALIZE FIREBASE
+        // =====================================================
+        firebase.initializeApp(FIREBASE_CONFIG);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // =====================================================
+        // TOAST HELPER
+        // =====================================================
+        function showToast(message, title = 'Notice', icon = 'fa-info-circle') {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = message;
+            document.getElementById('toast-title').textContent = title;
+            document.getElementById('toast-icon').className = `fa ${icon} text-xl`;
+            
+            toast.classList.remove('translate-y-100', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-100', 'opacity-0');
+                toast.classList.remove('translate-y-0', 'opacity-100');
+            }, 4000);
         }
 
-        // I-save sa Firebase
-        await db.collection('requests').add(formData);
+        // Format date nicely
+        function formatDate(dateStr) {
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+        }
 
-        // Notification
-        document.getElementById('alertTone').currentTime = 0;
-        document.getElementById('alertTone').play().catch(() => {});
-        document.getElementById('toastPopup').classList.add('show');
-        setTimeout(() => document.getElementById('toastPopup').classList.remove('show'), 4500);
+        // =====================================================
+        // GLOBAL STATE
+        // =====================================================
+        let currentUser = null; // { type: 'patient'|'doctor', id, name, email, doctorId? }
+        let selectedDoctorId = null;
+        let selectedSlotId = null;
+        let timeSlots = [];
 
-        // Reset form
-        e.target.reset();
-        document.getElementById('customConcernWrapper').classList.add('hidden');
-        document.getElementById('customLocationWrapper').classList.add('hidden');
-        alert('✅ Naipadala na sa Clinic! Maraming Salamat!');
+        // =====================================================
+        // DATABASE & AUTH FUNCTIONS
+        // =====================================================
+        function hashPassword(password) {
+            return CryptoJS.SHA256(password).toString();
+        }
 
-    } catch (error) {
-        alert('❌ Nabigo ang pagpapadala: ' + error.message + '\nSiguraduhing tama ang Firebase configuration.');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-    }
-});
+        // Initialize default doctors
+        async function initDoctors() {
+            const snapshot = await db.collection('doctors').get();
+            if (snapshot.empty) {
+                const batch = db.batch();
+                SAMPLE_DOCTORS.forEach(d => {
+                    batch.set(db.collection('doctors').doc(String(d.id)), {
+                        name: d.name,
+                        specialty: d.specialty,
+                        email: d.email,
+                        passwordHash: hashPassword(d.password)
+                    });
+                });
+                await batch.commit();
+                console.log('Default doctors created');
+            }
+        }
 
-</script>
+        // Generate time slots
+        function generateSlotsForDoctor(doctorId) {
+            const slots = [];
+            const today = new Date();
+            let slotId = Date.now();
+            
+            for (let offset = 0; offset < DAYS_AHEAD; offset++) {
+                const day = new Date(today);
+                day.setDate(today.getDate() + offset);
+                if (day.getDay() === 0 || day.getDay() === 6) continue; // Skip weekends
+                
+                const dateStr = day.toISOString().split('T')[0];
+                BUSINESS_HOURS.forEach(time => {
+                    slots.push({
+                        id: slotId++,
+                        doctorId: doctorId,
+                        date: dateStr,
+                        time: time,
+                        isBooked: false
+                    });
+                });
+            }
+            return slots;
+        }
+
+        // Load all slots
+        async function loadAllSlots() {
+            const snapshot = await db.collection('timeSlots').get();
+            timeSlots = [];
+            snapshot.forEach(doc => {
+                timeSlots.push(doc.data());
+            });
+            return timeSlots;
+        }
+
+        // Ensure slots exist for doctor
+        async function ensureSlotsForDoctor(doctorId) {
+            const slots = timeSlots.filter(s => s.doctorId === doctorId);
+            if (slots.length === 0) {
+                const newSlots = generateSlotsForDoctor(doctorId);
+                const batch = db.batch();
+                newSlots.forEach(s => {
+                    batch.set(db.collection('timeSlots').doc(String(s.id)), s);
+                });
+                await batch.commit();
+                timeSlots.push(...newSlots);
+            }
+        }
+
+        // Register Patient
+        async function registerPatient(fullName, email, password) {
+            const emailLower = email.toLowerCase();
+            const snapshot = await db.collection('patients').where('email', '==', emailLower).get();
+            if (!snapshot.empty) throw new Error('Email already exists');
+            
+            const userCred = await auth.createUserWithEmailAndPassword(emailLower, password);
+            await db.collection('patients').doc(userCred.user.uid).set({
+                fullName,
+                email: emailLower,
+                createdAt: new Date().toISOString()
+            });
+            return { uid: userCred.user.uid, fullName, email: emailLower };
+        }
+
+        // Login Patient
+        async function loginPatient(email, password) {
+            const emailLower = email.toLowerCase();
+            try {
+                const userCred = await auth.signInWithEmailAndPassword(emailLower, password);
+                const doc = await db.collection('patients').doc(userCred.user.uid).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    return { type: 'patient', id: userCred.user.uid, name: data.fullName, email: data.email };
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            return null;
+        }
+
+        // Login Doctor
+        async function loginDoctor(email, password) {
+            const passHash = hashPassword(password);
+            const snapshot = await db.collection('doctors').where('email', '==', email.toLowerCase()).get();
+            if (snapshot.empty) return null;
+            
+            let doctorData = null;
+            snapshot.forEach(doc => {
+                const d = doc.data();
+                if (d.passwordHash === passHash) {
+                    doctorData = { id: doc.id, ...d };
+                }
+            });
+            
+            if (doctorData) {
+                return { 
+                    type: 'doctor', 
+                    id: doctorData.id, 
+                    name: doctorData.name, 
+                    email: doctorData.email,
+                    specialty: doctorData.specialty,
+                    doctorId: doctorData.id
+                };
+            }
+            return null;
+        }
+
+        // Get all doctors
+        async function getDoctors() {
+            const snapshot = await db.collection('doctors').get();
+            return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+
+        // Get available slots
+        async function getAvailableSlots(doctorId) {
+            await loadAllSlots();
+            return timeSlots.filter(s => String(s.doctorId) === String(doctorId) && !s.isBooked);
+        }
+
+        // Book appointment
+        async function bookAppointment(patientId, doctorId, slotId) {
+            const slotRef = db.collection('timeSlots').doc(String(slotId));
+            const slotDoc = await slotRef.get();
+            if (!slotDoc.exists || slotDoc.data().isBooked) return null;
+
+            await slotRef.update({ isBooked: true });
+            await loadAllSlots();
+
+            const now = new Date();
+            const confirmationCode = `APT${now.getFullYear().toString().slice(-2)}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+            
+            const appointmentData = {
+                patientId,
+                doctorId,
+                slotId,
+                bookedAt: now.toISOString(),
+                confirmationCode,
+                date: slotDoc.data().date,
+                time: slotDoc.data().time
+            };
+            
+            await db.collection('appointments').add(appointmentData);
+            return confirmationCode;
+        }
+
+        // Cancel appointment
+        async function cancelAppointment(confirmationCode) {
+            const snapshot = await db.collection('appointments').where('confirmationCode', '==', confirmationCode).get();
+            if (snapshot.empty) return false;
+            
+            let apptDoc = snapshot.docs[0];
+            let appt = apptDoc.data();
+            
+            await db.collection('timeSlots').doc(String(appt.slotId)).update({ isBooked: false });
+            await apptDoc.ref.delete();
+            await loadAllSlots();
+            return true;
+        }
+
+        // Get patient appointments
+        async function getPatientAppointments(patientId) {
+            const snapshot = await db.collection('appointments').where('patientId', '==', patientId).get();
+            const doctors = await getDoctors();
+            
+            const appointments = [];
+            snapshot.forEach(doc => {
+                const a = doc.data();
+                const doctor = doctors.find(d => String(d.id) === String(a.doctorId));
+                appointments.push({
+                    code: a.confirmationCode,
+                    doctorName: doctor ? doctor.name : 'Unknown',
+                    specialty: doctor ? doctor.specialty : '',
+                    date: a.date,
+                    time: a.time
+                });
+            });
+            
+            return appointments.sort((x, y) => x.date.localeCompare(y.date) || x.time.localeCompare(y.time));
+        }
+
+        // 🔑 GET DOCTOR'S OWN APPOINTMENTS ONLY
+        async function getDoctorAppointments(doctorId) {
+            const snapshot = await db.collection('appointments').where('doctorId', '==', String(doctorId)).get();
+            const appointments = [];
+            
+            for (const doc of snapshot.docs) {
+                const a = doc.data();
+                const patientDoc = await db.collection('patients').doc(a.patientId).get();
+                const patient = patientDoc.exists ? patientDoc.data() : { fullName: 'Unknown', email: '' };
+                
+                appointments.push({
+                    patientName: patient.fullName || 'Unknown',
+                    patientEmail: patient.email || '',
+                    date: a.date,
+                    time: a.time,
+                    code: a.confirmationCode
+                });
+            }
+            
+            return appointments.sort((x, y) => x.date.localeCompare(y.date) || x.time.localeCompare(y.time));
+        }
+
+        // =====================================================
+        // RENDER NAVIGATION
+        // =====================================================
+        function renderNav() {
+            const nav = document.getElementById('sidebar-nav');
+            const userInfo = document.getElementById('user-info');
+            const logoutBtn = document.getElementById('logout-btn');
+            
+            if (!currentUser) {
+                nav.innerHTML = `
+                    <a href="#login" class="sidebar-link active" data-page="login">
+                        <i class="fa fa-sign-in"></i>
+                        <span>Login / Register</span>
+                    </a>
+                `;
+                userInfo.classList.add('hidden');
+                logoutBtn.classList.add('hidden');
+            } else if (currentUser.type === 'patient') {
+                nav.innerHTML = `
+                    <a href="#book" class="sidebar-link active" data-page="book">
+                        <i class="fa fa-calendar-plus-o"></i>
+                        <span>Book Appointment</span>
+                    </a>
+                    <a href="#appointments" class="sidebar-link" data-page="appointments">
+                        <i class="fa fa-list-alt"></i>
+                        <span>My Appointments</span>
+                    </a>
+                `;
+                userInfo.classList.remove('hidden');
+                logoutBtn.classList.remove('hidden');
+                document.getElementById('user-name').textContent = currentUser.name;
+                document.getElementById('user-role').textContent = 'Patient';
+            } else if (currentUser.type === 'doctor') {
+                nav.innerHTML = `
+                    <a href="#schedule" class="sidebar-link active" data-page="schedule">
+                        <i class="fa fa-calendar-check-o"></i>
+                        <span>My Schedule</span>
+                    </a>
+                `;
+                userInfo.classList.remove('hidden');
+                logoutBtn.classList.remove('hidden');
+                document.getElementById('user-name').textContent = currentUser.name;
+                document.getElementById('user-role').textContent = 'Doctor — ' + currentUser.specialty;
+            }
+
+            document.querySelectorAll('#sidebar-nav a').forEach(link => {
+                link.addEventListener('click', e => {
+                    e.preventDefault();
+                    document.querySelectorAll('#sidebar-nav a').forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                    const page = link.getAttribute('data-page');
+                    if (page === 'login') renderLoginPage();
+                    else if (page === 'book') renderBookPage();
+                    else if (page === 'appointments') renderAppointmentsPage();
+                    else if (page === 'schedule') renderSchedulePage();
+                });
+            });
+        }
+
+        // =====================================================
+        // LOGIN / REGISTER PAGE
+        // =====================================================
+        async function renderLoginPage() {
+            currentUser = null;
+            renderNav();
+            const content = document.getElementById('page-content');
+            const doctors = await getDoctors();
+            
+            content.innerHTML = `
+                <div class="max-w-md mx-auto mt-8">
+                    <div class="bg-white rounded-xl card-shadow p-6 md:p-8">
+                        <h2 class="text-2xl font-bold text-center mb-6 text-primary">Welcome</h2>
+                        
+                        <!-- Tabs -->
+                        <div class="flex border-b border-gray-200 mb-6">
+                            <button class="tab-btn active" data-tab="patient-login">Patient Login</button>
+                            <button class="tab-btn" data-tab="register">Create Account</button>
+                            <button class="tab-btn" data-tab="doctor-login">Doctor Login</button>
+                        </div>
+                        
+                        <!-- Patient Login -->
+                        <div id="patient-login" class="tab-content">
+                            <h3 class="text-lg font-medium mb-4">Patient Login</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                    <input type="email" id="login-email" class="form-input" placeholder="Enter your email">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                    <input type="password" id="login-password" class="form-input" placeholder="Enter your password">
+                                </div>
+                                <button id="login-btn" class="btn btn-primary w-full mt-2">Log In</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Register -->
+                        <div id="register" class="tab-content hidden">
+                            <h3 class="text-lg font-medium mb-4">Create Patient Account</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                                    <input type="text" id="reg-name" class="form-input" placeholder="Your full name">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                    <input type="email" id="reg-email" class="form-input" placeholder="Enter your email">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                    <input type="password" id="reg-password" class="form-input" placeholder="At least 6 characters">
+                                </div>
+                                <button id="register-btn" class="btn btn-secondary w-full mt-2">Create Account</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Doctor Login -->
+                        <div id="doctor-login" class="tab-content hidden">
+                            <h3 class="text-lg font-medium mb-4">Doctor Login</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                    <input type="email" id="doctor-email" class="form-input" placeholder="Your work email">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                    <input type="password" id="doctor-password" class="form-input" placeholder="Enter password">
+                                </div>
+                                <div class="text-xs text-gray-500 bg-gray-50 p-2 rounded mb-2">
+                                    <strong>Sample Accounts:</strong><br>
+                                    Dr. Ana Reyes → doctor@clinic.com / doctor123<br>
+                                    Dr. Juan Dela Cruz → dentist@clinic.com / dentist123
+                                </div>
+                                <button id="doctor-login-submit" class="btn btn-primary w-full mt-2">Log In as Doctor</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Tab switching
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                    document.getElementById(btn.dataset.tab).classList.remove('hidden');
+                });
+            });
+
+            // Patient Login
+            document.getElementById('login-btn').addEventListener('click', async () => {
+                const email = document.getElementById('login-email').value.trim();
+                const password = document.getElementById('login-password').value;
+                
+                if (!email || !password) {
+                    showToast('Please fill in all fields.', 'Missing Information', 'fa-exclamation-circle');
+                    return;
+                }
+                
+                const patient = await loginPatient(email, password);
+                if (patient) {
+                    currentUser = patient;
+                    showToast(`Welcome back, ${patient.name}!`, 'Login Successful', 'fa-check-circle');
+                    renderBookPage();
+                } else {
+                    showToast('Invalid email or password.', 'Login Failed', 'fa-times-circle');
+                }
+            });
+
+            // Register
+            document.getElementById('register-btn').addEventListener('click', async () => {
+                const name = document.getElementById('reg-name').value.trim();
+                const email = document.getElementById('reg-email').value.trim();
+                const password = document.getElementById('reg-password').value;
+                
+                if (!name || !email || !password) {
+                    showToast('Please fill in all fields.', 'Missing Information', 'fa-exclamation-circle');
+                    return;
+                }
+                if (!email.includes('@') || !email.includes('.')) {
+                    showToast('Please enter a valid email address.', 'Invalid Email', 'fa-exclamation-circle');
+                    return;
+                }
+                if (password.length < 6) {
+                    showToast('Password must be at least 6 characters.', 'Weak Password', 'fa-exclamation-triangle');
+                    return;
+                }
+                
+                try {
+                    await registerPatient(name, email, password);
+                    showToast('Account created successfully! You may now log in.', 'Account Created', 'fa-check-circle');
+                    document.querySelector('[data-tab="patient-login"]').click();
+                } catch (e) {
+                    showToast(e.message || 'Failed to create account.', 'Error', 'fa-exclamation-circle');
+                }
+            });
+
+            // Doctor Login
+            document.getElementById('doctor-login-submit').addEventListener('click', async () => {
+                const email = document.getElementById('doctor-email').value.trim();
+                const password = document.getElementById('doctor-password').value;
+                
+                if (!email || !password) {
+                    showToast('Please enter email and password.', 'Missing Information', 'fa-exclamation-circle');
+                    return;
+                }
+                
+                const doctor = await loginDoctor(email, password);
+                if (doctor) {
+                    currentUser = doctor;
+                    await ensureSlotsForDoctor(doctor.doctorId);
+                    showToast(`Welcome, Dr. ${doctor.name.split(' ')[1]}!`, 'Access Granted', 'fa-user-md');
+                    renderSchedulePage();
+                } else {
+                    showToast('Invalid doctor credentials.', 'Login Failed', 'fa-times-circle');
+                }
+            });
+        }
+
+        // =====================================================
+        // BOOK APPOINTMENT PAGE
+        // =====================================================
+        async function renderBookPage() {
+            if (!currentUser || currentUser.type !== 'patient') return renderLoginPage();
+            renderNav();
+            selectedDoctorId = null;
+            selectedSlotId = null;
+            
+            const content = document.getElementById('page-content');
+            const doctors = await getDoctors();
+            const specialties = [...new Set(doctors.map(d => d.specialty))];
+            
+            content.innerHTML = `
+                <div class="space-y-6">
+                    <div class="bg-white rounded-xl card-shadow p-6">
+                        <h2 class="text-xl font-bold mb-6 text-primary">Book an Appointment</h2>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Specialty</label>
+                            <select id="specialty-filter" class="form-input mb-4">
+                                <option value="all">All Specialties</option>
+                                ${specialties.map(s => `<option value="${s}">${s}</option>`).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Select a Doctor</label>
+                            <div id="doctor-list" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                ${doctors.map(d => `
+                                    <div class="doctor-card border rounded-lg p-4 cursor-pointer hover:border-primary hover:bg-primary/5 transition-all" data-doctor-id="${d.id}" data-specialty="${d.specialty}">
+                                        <h3 class="font-semibold text-lg">${d.name}</h3>
+                                        <p class="text-sm text-gray-500">${d.specialty}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="slots-section" class="bg-white rounded-xl card-shadow p-6 hidden">
+                        <h3 class="text-lg font-semibold mb-4">Available Time Slots</h3>
+                        <p id="selected-doctor-name" class="text-gray-600 mb-4"></p>
+                        <div id="slots-container" class="space-y-4"></div>
+                        <button id="book-selected-btn" class="btn btn-secondary mt-6 hidden">Book Selected Slot</button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('specialty-filter').addEventListener('change', e => {
+                const val = e.target.value;
+                document.querySelectorAll('.doctor-card').forEach(card => {
+                    if (val === 'all' || card.dataset.specialty === val) {
+                        card.classList.remove('hidden');
+                    } else {
+                        card.classList.add('hidden');
+                    }
+                });
+            });
+
+            document.querySelectorAll('.doctor-card').forEach(card => {
+                card.addEventListener('click', async () => {
+                    document.querySelectorAll('.doctor-card').forEach(c => {
+                        c.classList.remove('border-primary', 'bg-primary/5');
+                        c.classList.add('border-gray-200');
+                    });
+                    card.classList.remove('border-gray-200');
+                    card.classList.add('border-primary', 'bg-primary/5');
+                    
+                    selectedDoctorId = card.dataset.doctorId;
+                    selectedSlotId = null;
+                    const doctors = await getDoctors();
+                    const doctor = doctors.find(d => String(d.id) === String(selectedDoctorId));
+                    
+                    document.getElementById('slots-section').classList.remove('hidden');
+                    document.getElementById('selected-doctor-name').textContent = `${doctor.name} — ${doctor.specialty}`;
+                    await loadSlots();
+                });
+            });
+
+            document.getElementById('book-selected-btn').addEventListener('click', async () => {
+                if (!selectedSlotId) return;
+                const code = await bookAppointment(currentUser.id, selectedDoctorId, selectedSlotId);
+                if (code) {
+                    showToast(`Appointment confirmed! Confirmation code: ${code}`, 'Booking Successful', 'fa-check-circle');
+                    await loadSlots();
+                    document.getElementById('book-selected-btn').classList.add('hidden');
+                    selectedSlotId = null;
+                } else {
+                    showToast('Sorry, this slot has already been taken.', 'Booking Failed', 'fa-times-circle');
+                }
+            });
+        }
+
+        async function loadSlots() {
+            const slots = await getAvailableSlots(selectedDoctorId);
+            const container = document.getElementById('slots-container');
+            selectedSlotId = null;
+            document.getElementById('book-selected-btn').classList.add('hidden');
+            
+            if (!slots.length) {
+                container.innerHTML = `<p class="text-gray-500 italic">No available slots for this doctor in the coming days.</p>`;
+                return;
+            }
+
+            const grouped = {};
+            slots.forEach(s => {
+                if (!grouped[s.date]) grouped[s.date] = [];
+                grouped[s.date].push(s);
+            });
+
+            container.innerHTML = Object.entries(grouped).map(([date, slots]) => `
+                <div class="border-b pb-3">
+                    <h4 class="font-medium text-gray-700 mb-2">${formatDate(date)}</h4>
+                    <div class="flex flex-wrap gap-2">
+                        ${slots.map(slot => `
+                            <button class="slot-btn available" data-slot-id="${slot.id}" data-date="${date}" data-time="${slot.time}">
+                                ${slot.time}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            container.querySelectorAll('.slot-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    container.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selectedSlotId = parseInt(btn.dataset.slotId);
+                    document.getElementById('book-selected-btn').classList.remove('hidden');
+                });
+            });
+        }
+
+        // =====================================================
+        // PATIENT'S APPOINTMENTS PAGE
+        // =====================================================
+        async function renderAppointmentsPage() {
+            if (!currentUser || currentUser.type !== 'patient') return renderLoginPage();
+            renderNav();
+            
+            const appointments = await getPatientAppointments(currentUser.id);
+            const content = document.getElementById('page-content');
+            
+            content.innerHTML = `
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <h2 class="text-xl font-bold mb-6 text-primary">My Appointments</h2>
+                    ${!appointments.length ? `
+                        <div class="text-center py-10 text-gray-500">
+                            <i class="fa fa-calendar-o text-4xl mb-4"></i>
+                            <p>You have no upcoming appointments.</p>
+                            <a href="#book" class="text-primary font-medium mt-2 inline-block" onclick="renderBookPage()">Book your first appointment</a>
+                        </div>
+                    ` : `
+                        <div class="overflow-x-auto">
+                            <table class="w-full border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 border-b">
+                                        <th class="text-left p-3 font-semibold text-sm">Confirmation #</th>
+                                        <th class="text-left p-3 font-semibold text-sm">Doctor</th>
+                                        <th class="text-left p-3 font-semibold text-sm">Date</th>
+                                        <th class="text-left p-3 font-semibold text-sm">Time</th>
+                                        <th class="text-left p-3 font-semibold text-sm">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${appointments.map(a => `
+                                        <tr class="border-b hover:bg-gray-50">
+                                            <td class="p-3 font-mono text-sm">${a.code}</td>
+                                            <td class="p-3">
+                                                <div class="font-medium">${a.doctorName}</div>
+                                                <div class="text-xs text-gray-500">${a.specialty}</div>
+                                            </td>
+                                            <td class="p-3">${formatDate(a.date)}</td>
+                                            <td class="p-3">${a.time}</td>
+                                            <td class="p-3">
+                                                <button class="btn btn-danger text-xs py-1 px-2 cancel-btn" data-code="${a.code}">Cancel</button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `}
+                </div>
+            `;
+
+            document.querySelectorAll('.cancel-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const code = btn.dataset.code;
+                    if (confirm('Are you sure you want to cancel this appointment?')) {
+                        await cancelAppointment(code);
+                        showToast('Appointment cancelled successfully.', 'Cancelled', 'fa-info-circle');
+                        renderAppointmentsPage();
+                    }
+                });
+            });
+        }
+
+        // =====================================================
+        // 🔑 DOCTOR'S SCHEDULE PAGE — SARILI LANG ANG NAKIKITA
+        // =====================================================
+        async function renderSchedulePage() {
+            if (!currentUser || currentUser.type !== 'doctor') return renderLoginPage();
+            renderNav();
+            
+            const appointments = await getDoctorAppointments(currentUser.doctorId);
+            const content = document.getElementById('page-content');
+            
+            content.innerHTML = `
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h2 class="text-xl font-bold text-primary">${currentUser.name}</h2>
+                            <p class="text-gray-500">${currentUser.specialty} — My Schedule Only</p>
+                        </div>
+                        <button id="refresh-btn" class="btn btn-outline text-sm">
+                            <i class="fa fa-refresh mr-1"></i> Refresh
+                        </button>
+                    </div>
+                    
+                    ${!appointments.length ? `
+                        <div class="text-center py-10 text-gray-500">
+                            <i class="fa fa-calendar-check-o text-4xl mb-4"></i>
+                            <p>You have no scheduled appointments yet.</p>
+                            <p class="text-sm mt-2">Only your own appointments appear here.</p>
+                        </div>
+                    ` : `
+                        <div class="overflow-x-auto">
+                            <table class="w-full border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 border-b">
+                                        <th class="text-left p-3 font-semibold text-sm">Patient Name</th>
+                                        <th class="text-left p-3 font-semibold text-sm">Email</th>
+                                        <th class="text-left p-3 font-semibold text-sm">Date</th>
+                                        <th class="text-left p-3 font-semibold text-sm">Time</th>
+                                        <th class="text-left p-3 font-semibold text-sm">Reference #</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${appointments.map(a => `
+                                        <tr class="border-b hover:bg-gray-50">
+                                            <td class="p-3 font-medium">${a.patientName}</td>
+                                            <td class="p-3 text-sm">${a.patientEmail}</td>
+                                            <td class="p-3">${formatDate(a.date)}</td>
+                                            <td class="p-3">${a.time}</td>
+                                            <td class="p-3 font-mono text-xs">${a.code}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `}
+                </div>
+            `;
+
+            document.getElementById('refresh-btn').addEventListener('click', renderSchedulePage);
+        }
+
+        // =====================================================
+        // GLOBAL INITIALIZATION
+        // =====================================================
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            await auth.signOut();
+            currentUser = null;
+            showToast('You have been logged out.', 'Logged Out', 'fa-sign-out');
+            renderLoginPage();
+        });
+
+        document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('hidden');
+            sidebar.classList.toggle('fixed');
+            sidebar.classList.toggle('z-40');
+            sidebar.classList.toggle('inset-y-0');
+            sidebar.classList.toggle('left-0');
+        });
+
+        // Auth state persistence — stay logged in across devices
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                const doc = await db.collection('patients').doc(user.uid).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    currentUser = { type: 'patient', id: user.uid, name: data.fullName, email: data.email };
+                    renderBookPage();
+                }
+            } else {
+                await initDoctors();
+                renderLoginPage();
+            }
+        });
+    </script>
 </body>
 </html>

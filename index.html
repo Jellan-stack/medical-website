@@ -3,941 +3,717 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clinic Appointment System</title>
+    <title>🏫 Paaralang Klinika - Sistema ng Pagpapalista</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
-    
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#2563eb',
-                        secondary: '#10b981',
-                        accent: '#f59e0b',
-                        light: '#f1f5f9',
-                        dark: '#1e293b',
-                        danger: '#ef4444',
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'Segoe UI', 'sans-serif'],
-                    },
-                }
-            }
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        
+        /* ==============================================
+           ✅ BACKGROUND LARAWAN — SA LOGIN PAGE LANG
+           ============================================== */
+        .school-bg {
+            background: linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.15)), 
+                        url('clinic.jpg'); /* ✅ ITO ANG LARAWAN MO */
+            background-size: 100% auto;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
         }
-    </script>
-    <style type="text/tailwindcss">
-        @layer utilities {
-            .card-shadow {
-                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-            }
-            .sidebar-link {
-                @apply flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 hover:bg-primary/10 hover:text-primary;
-            }
-            .sidebar-link.active {
-                @apply bg-primary/10 text-primary font-medium;
-            }
-            .form-input {
-                @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
-            }
-            .btn {
-                @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
-            }
-            .btn-primary {
-                @apply bg-primary text-white hover:bg-primary/90;
-            }
-            .btn-secondary {
-                @apply bg-secondary text-white hover:bg-secondary/90;
-            }
-            .btn-danger {
-                @apply bg-danger text-white hover:bg-danger/90;
-            }
-            .btn-outline {
-                @apply border border-primary text-primary hover:bg-primary/5;
-            }
-            .tab-btn {
-                @apply px-4 py-2 border-b-2 border-transparent transition-all hover:bg-gray-50;
-            }
-            .tab-btn.active {
-                @apply border-primary text-primary font-medium;
-            }
-            .slot-btn {
-                @apply px-3 py-2 border rounded-lg text-center transition-all;
-            }
-            .slot-btn.available {
-                @apply border-secondary text-secondary hover:bg-secondary/10 cursor-pointer;
-            }
-            .slot-btn.unavailable {
-                @apply border-gray-300 text-gray-400 cursor-not-allowed;
-            }
-            .slot-btn.selected {
-                @apply bg-primary text-white border-primary;
-            }
+        /* ✅ LOGIN FORM — TRANSPARENT PA RIN */
+        .glass {
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(2px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #000000 !important; /* ✅ ITIM NA TEKSTO — MALINAW */
+        }
+        /* ✅ DASHBOARD — PUTI NA AT HINDI TRANSPARENT */
+        .dashboard-card {
+            background: #ffffff; /* ✅ PURONG PUTI */
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .sidebar {
+            background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
+            min-height: 100vh;
+        }
+        .sidebar-link {
+            transition: all 0.2s ease;
+        }
+        .sidebar-link:hover, .sidebar-link.active {
+            background: rgba(255, 255, 255, 0.15);
+            border-left: 3px solid #fbbf24;
+        }
+        .stat-card {
+            border-radius: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ✨ IDINAGDAG: ANIMATION SA PAG-CLICK NG BUTTON */
+        button:active, .btn-click {
+            transform: scale(0.97);
+            transition: transform 0.1s ease;
+        }
+        button {
+            position: relative;
+            overflow: hidden;
+        }
+        button::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle, rgba(255,255,255,0.25), transparent 60%);
+            transform: scale(0);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        button:active::after {
+            transform: scale(1.8);
+            opacity: 1;
+            transition: 0s;
+        }
+
+        .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .status-pending { background: #fef08a; color: #854d0e; }
+        .status-approved { background: #bbf7d0; color: #166534; }
+        .status-rejected { background: #fecaca; color: #991b1b; }
+        .status-urgent { background: #fca5a5; color: #7f1d1d; }
+        table tbody tr { transition: background 0.15s; }
+        table tbody tr:hover { background: #eff6ff; }
+        /* ✅ TEKSTO SA LOGIN — ITIM AT MALINAW */
+        #authSection label,
+        #authSection h1,
+        #authSection p,
+        #authSection button,
+        #authSection input,
+        #authSection select {
+            color: #000000 !important;
+            font-weight: 600;
+        }
+        #authSection input::placeholder {
+            color: #444444;
+            font-weight: 500;
+        }
+        /* ✨ Kasaysayan Panel */
+        .history-panel {
+            max-height: 400px;
+            overflow-y: auto;
         }
     </style>
 </head>
-<body class="bg-gray-50 text-dark font-sans min-h-screen">
-    <div id="app" class="flex flex-col md:flex-row min-h-screen">
-        <!-- Sidebar -->
-        <aside id="sidebar" class="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 p-4 sticky top-0 h-screen">
-            <div class="mb-8 mt-2">
-                <h1 class="text-xl font-bold text-primary flex items-center gap-2">
-                    <i class="fa fa-heartbeat"></i>
-                    <span>Clinic App</span>
-                </h1>
-                <p class="text-sm text-gray-500 mt-1">Appointment System</p>
-            </div>
-            
-            <nav id="sidebar-nav" class="flex-1 space-y-1">
-                <!-- Navigation links will be inserted dynamically -->
-            </nav>
-            
-            <div id="user-area" class="mt-auto pt-4 border-t border-gray-200">
-                <div id="user-info" class="hidden mb-3">
-                    <p class="font-medium text-sm" id="user-name"></p>
-                    <p class="text-xs text-gray-500" id="user-role"></p>
+<body class="bg-gray-50 min-h-screen"> <!-- ✅ BODY = PUTI NA, WALANG LARAWAN -->
+<!-- ======================================
+     🔐 PAHINA NG PAGPASOK — MAY LARAWAN
+     ====================================== -->
+<div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4"> <!-- ✅ LARAWAN DITO LANG -->
+    <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
+        <div class="text-center mb-8">
+            <i class="fa-solid fa-heart-pulse text-4xl text-red-500 mb-2"></i>
+            <h1 class="text-2xl font-bold text-gray-800">Clinic Appointment System</h1>
+            <p class="text-gray-500">Sistema ng Pagpapalista sa Klinika</p>
+        </div>
+        <div class="flex mb-6 border-b border-gray-200">
+            <button id="tabLogin" class="flex-1 py-3 text-center tab-active transition-all" onclick="showAuthTab('login')">
+                <i class="fa-solid fa-right-to-bracket mr-2"></i> Pagpasok
+            </button>
+            <button id="tabRegister" class="flex-1 py-3 text-center text-gray-500 transition-all" onclick="showAuthTab('register')">
+                <i class="fa-solid fa-user-plus mr-2"></i> Lumikha ng Account
+            </button>
+        </div>
+        <!-- 📋 FORM: PAGPASOK -->
+        <div id="formLogin">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 font-medium mb-1">Email</label>
+                    <input type="email" id="loginEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="iyong@email.com">
                 </div>
-                <button id="logout-btn" class="sidebar-link text-gray-600 hidden">
-                    <i class="fa fa-sign-out"></i>
-                    <span>Log Out</span>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-1">Lihim na Salita</label>
+                    <input type="password" id="loginPass" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••">
+                </div>
+                <button onclick="loginUser()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-all">
+                    Pumasok
                 </button>
-            </div>
-        </aside>
-        <!-- Main Content -->
-        <main class="flex-1 p-4 md:p-6">
-            <!-- Mobile Header -->
-            <div class="md:hidden flex justify-between items-center mb-6">
-                <h1 class="text-xl font-bold text-primary flex items-center gap-2">
-                    <i class="fa fa-heartbeat"></i>
-                    <span>Clinic Appointment</span>
-                </h1>
-                <button id="mobile-menu-btn" class="text-dark p-2">
-                    <i class="fa fa-bars"></i>
-                </button>
-            </div>
-            <!-- Page Content -->
-            <div id="page-content" class="max-w-5xl mx-auto">
-                <!-- Content loads here dynamically -->
-            </div>
-        </main>
-    </div>
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-6 right-6 bg-white rounded-lg card-shadow p-4 max-w-sm transform translate-y-100 opacity-0 transition-all duration-300 z-50 pointer-events-none">
-        <div class="flex items-start gap-3">
-            <i id="toast-icon" class="fa fa-check-circle text-xl text-secondary"></i>
-            <div>
-                <h4 id="toast-title" class="font-medium">Success</h4>
-                <p id="toast-message" class="text-sm text-gray-600 mt-1"></p>
             </div>
         </div>
+        <!-- 📝 FORM: PAGREHISTRO -->
+        <div id="formRegister" class="hidden">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 font-medium mb-1">Buong Pangalan</label>
+                    <input type="text" id="regName" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Juan Dela Cruz">
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-1">Email</label>
+                    <input type="email" id="regEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="iyong@email.com">
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-1">Password</label>
+                    <input type="password" id="regPass" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Hindi bababa sa 6 na titik">
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-1">Ikaw ay isang...</label>
+                    <select id="regRole" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <option value="Student"> 🎓 Student</option>
+                        <option value="Teacher"> 📖 Teacher</option>
+                        <option value="Staff"> 🏛️ Staff</option>
+                    </select>
+                </div>
+                <button onclick="registerUser()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-all">
+                    Lumikha ng Account
+                </button>
+            </div>
+        </div>
+        <p id="authMsg" class="mt-4 text-center font-medium"></p>
     </div>
-
-    <script>
-        // =====================================================
-        // 🔧 KAILANGAN I-SETUP ANG FIREBASE — ILAGAY ANG INYONG DATA DITO
-        // =====================================================
-        const FIREBASE_CONFIG = {
-            apiKey: "AIzaSyC5u4Rz5K6Zb8xP9aD7eF3g2h1j0k9l8m7n6b5v4c3x2z1a0",
-            authDomain: "your-clinic-app.firebaseapp.com",
-            projectId: "your-clinic-app",
-            storageBucket: "your-clinic-app.appspot.com",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:abc123def456ghi789jkl0"
-        };
-
-        // =====================================================
-        // CONFIGURATION
-        // =====================================================
-        const BUSINESS_HOURS = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"];
-        const DAYS_AHEAD = 7;
-        const SAMPLE_DOCTORS = [
-            { id: 1, name: "Dr. Ana Reyes", specialty: "General Medicine", email: "doctor@clinic.com", password: "doctor123" },
-            { id: 2, name: "Dr. Juan Dela Cruz", specialty: "Dentistry", email: "dentist@clinic.com", password: "dentist123" }
-        ];
-
-        // =====================================================
-        // 🔥 INITIALIZE FIREBASE
-        // =====================================================
-        firebase.initializeApp(FIREBASE_CONFIG);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-
-        // =====================================================
-        // TOAST HELPER
-        // =====================================================
-        function showToast(message, title = 'Notice', icon = 'fa-info-circle') {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-message').textContent = message;
-            document.getElementById('toast-title').textContent = title;
-            document.getElementById('toast-icon').className = `fa ${icon} text-xl`;
-            
-            toast.classList.remove('translate-y-100', 'opacity-0');
-            toast.classList.add('translate-y-0', 'opacity-100');
-            
-            setTimeout(() => {
-                toast.classList.add('translate-y-100', 'opacity-0');
-                toast.classList.remove('translate-y-0', 'opacity-100');
-            }, 4000);
-        }
-
-        // Format date nicely
-        function formatDate(dateStr) {
-            const d = new Date(dateStr);
-            return d.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-        }
-
-        // =====================================================
-        // GLOBAL STATE
-        // =====================================================
-        let currentUser = null; // { type: 'patient'|'doctor', id, name, email, doctorId? }
-        let selectedDoctorId = null;
-        let selectedSlotId = null;
-        let timeSlots = [];
-
-        // =====================================================
-        // DATABASE & AUTH FUNCTIONS
-        // =====================================================
-        function hashPassword(password) {
-            return CryptoJS.SHA256(password).toString();
-        }
-
-        // Initialize default doctors
-        async function initDoctors() {
-            const snapshot = await db.collection('doctors').get();
-            if (snapshot.empty) {
-                const batch = db.batch();
-                SAMPLE_DOCTORS.forEach(d => {
-                    batch.set(db.collection('doctors').doc(String(d.id)), {
-                        name: d.name,
-                        specialty: d.specialty,
-                        email: d.email,
-                        passwordHash: hashPassword(d.password)
-                    });
-                });
-                await batch.commit();
-                console.log('Default doctors created');
-            }
-        }
-
-        // Generate time slots
-        function generateSlotsForDoctor(doctorId) {
-            const slots = [];
-            const today = new Date();
-            let slotId = Date.now();
-            
-            for (let offset = 0; offset < DAYS_AHEAD; offset++) {
-                const day = new Date(today);
-                day.setDate(today.getDate() + offset);
-                if (day.getDay() === 0 || day.getDay() === 6) continue; // Skip weekends
-                
-                const dateStr = day.toISOString().split('T')[0];
-                BUSINESS_HOURS.forEach(time => {
-                    slots.push({
-                        id: slotId++,
-                        doctorId: doctorId,
-                        date: dateStr,
-                        time: time,
-                        isBooked: false
-                    });
-                });
-            }
-            return slots;
-        }
-
-        // Load all slots
-        async function loadAllSlots() {
-            const snapshot = await db.collection('timeSlots').get();
-            timeSlots = [];
-            snapshot.forEach(doc => {
-                timeSlots.push(doc.data());
-            });
-            return timeSlots;
-        }
-
-        // Ensure slots exist for doctor
-        async function ensureSlotsForDoctor(doctorId) {
-            const slots = timeSlots.filter(s => s.doctorId === doctorId);
-            if (slots.length === 0) {
-                const newSlots = generateSlotsForDoctor(doctorId);
-                const batch = db.batch();
-                newSlots.forEach(s => {
-                    batch.set(db.collection('timeSlots').doc(String(s.id)), s);
-                });
-                await batch.commit();
-                timeSlots.push(...newSlots);
-            }
-        }
-
-        // Register Patient
-        async function registerPatient(fullName, email, password) {
-            const emailLower = email.toLowerCase();
-            const snapshot = await db.collection('patients').where('email', '==', emailLower).get();
-            if (!snapshot.empty) throw new Error('Email already exists');
-            
-            const userCred = await auth.createUserWithEmailAndPassword(emailLower, password);
-            await db.collection('patients').doc(userCred.user.uid).set({
-                fullName,
-                email: emailLower,
-                createdAt: new Date().toISOString()
-            });
-            return { uid: userCred.user.uid, fullName, email: emailLower };
-        }
-
-        // Login Patient
-        async function loginPatient(email, password) {
-            const emailLower = email.toLowerCase();
-            try {
-                const userCred = await auth.signInWithEmailAndPassword(emailLower, password);
-                const doc = await db.collection('patients').doc(userCred.user.uid).get();
-                if (doc.exists) {
-                    const data = doc.data();
-                    return { type: 'patient', id: userCred.user.uid, name: data.fullName, email: data.email };
-                }
-            } catch (e) {
-                console.error(e);
-            }
-            return null;
-        }
-
-        // Login Doctor
-        async function loginDoctor(email, password) {
-            const passHash = hashPassword(password);
-            const snapshot = await db.collection('doctors').where('email', '==', email.toLowerCase()).get();
-            if (snapshot.empty) return null;
-            
-            let doctorData = null;
-            snapshot.forEach(doc => {
-                const d = doc.data();
-                if (d.passwordHash === passHash) {
-                    doctorData = { id: doc.id, ...d };
-                }
-            });
-            
-            if (doctorData) {
-                return { 
-                    type: 'doctor', 
-                    id: doctorData.id, 
-                    name: doctorData.name, 
-                    email: doctorData.email,
-                    specialty: doctorData.specialty,
-                    doctorId: doctorData.id
-                };
-            }
-            return null;
-        }
-
-        // Get all doctors
-        async function getDoctors() {
-            const snapshot = await db.collection('doctors').get();
-            return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        }
-
-        // Get available slots
-        async function getAvailableSlots(doctorId) {
-            await loadAllSlots();
-            return timeSlots.filter(s => String(s.doctorId) === String(doctorId) && !s.isBooked);
-        }
-
-        // Book appointment
-        async function bookAppointment(patientId, doctorId, slotId) {
-            const slotRef = db.collection('timeSlots').doc(String(slotId));
-            const slotDoc = await slotRef.get();
-            if (!slotDoc.exists || slotDoc.data().isBooked) return null;
-
-            await slotRef.update({ isBooked: true });
-            await loadAllSlots();
-
-            const now = new Date();
-            const confirmationCode = `APT${now.getFullYear().toString().slice(-2)}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-            
-            const appointmentData = {
-                patientId,
-                doctorId,
-                slotId,
-                bookedAt: now.toISOString(),
-                confirmationCode,
-                date: slotDoc.data().date,
-                time: slotDoc.data().time
-            };
-            
-            await db.collection('appointments').add(appointmentData);
-            return confirmationCode;
-        }
-
-        // Cancel appointment
-        async function cancelAppointment(confirmationCode) {
-            const snapshot = await db.collection('appointments').where('confirmationCode', '==', confirmationCode).get();
-            if (snapshot.empty) return false;
-            
-            let apptDoc = snapshot.docs[0];
-            let appt = apptDoc.data();
-            
-            await db.collection('timeSlots').doc(String(appt.slotId)).update({ isBooked: false });
-            await apptDoc.ref.delete();
-            await loadAllSlots();
-            return true;
-        }
-
-        // Get patient appointments
-        async function getPatientAppointments(patientId) {
-            const snapshot = await db.collection('appointments').where('patientId', '==', patientId).get();
-            const doctors = await getDoctors();
-            
-            const appointments = [];
-            snapshot.forEach(doc => {
-                const a = doc.data();
-                const doctor = doctors.find(d => String(d.id) === String(a.doctorId));
-                appointments.push({
-                    code: a.confirmationCode,
-                    doctorName: doctor ? doctor.name : 'Unknown',
-                    specialty: doctor ? doctor.specialty : '',
-                    date: a.date,
-                    time: a.time
-                });
-            });
-            
-            return appointments.sort((x, y) => x.date.localeCompare(y.date) || x.time.localeCompare(y.time));
-        }
-
-        // 🔑 GET DOCTOR'S OWN APPOINTMENTS ONLY
-        async function getDoctorAppointments(doctorId) {
-            const snapshot = await db.collection('appointments').where('doctorId', '==', String(doctorId)).get();
-            const appointments = [];
-            
-            for (const doc of snapshot.docs) {
-                const a = doc.data();
-                const patientDoc = await db.collection('patients').doc(a.patientId).get();
-                const patient = patientDoc.exists ? patientDoc.data() : { fullName: 'Unknown', email: '' };
-                
-                appointments.push({
-                    patientName: patient.fullName || 'Unknown',
-                    patientEmail: patient.email || '',
-                    date: a.date,
-                    time: a.time,
-                    code: a.confirmationCode
-                });
-            }
-            
-            return appointments.sort((x, y) => x.date.localeCompare(y.date) || x.time.localeCompare(y.time));
-        }
-
-        // =====================================================
-        // RENDER NAVIGATION
-        // =====================================================
-        function renderNav() {
-            const nav = document.getElementById('sidebar-nav');
-            const userInfo = document.getElementById('user-info');
-            const logoutBtn = document.getElementById('logout-btn');
-            
-            if (!currentUser) {
-                nav.innerHTML = `
-                    <a href="#login" class="sidebar-link active" data-page="login">
-                        <i class="fa fa-sign-in"></i>
-                        <span>Login / Register</span>
-                    </a>
-                `;
-                userInfo.classList.add('hidden');
-                logoutBtn.classList.add('hidden');
-            } else if (currentUser.type === 'patient') {
-                nav.innerHTML = `
-                    <a href="#book" class="sidebar-link active" data-page="book">
-                        <i class="fa fa-calendar-plus-o"></i>
-                        <span>Book Appointment</span>
-                    </a>
-                    <a href="#appointments" class="sidebar-link" data-page="appointments">
-                        <i class="fa fa-list-alt"></i>
-                        <span>My Appointments</span>
-                    </a>
-                `;
-                userInfo.classList.remove('hidden');
-                logoutBtn.classList.remove('hidden');
-                document.getElementById('user-name').textContent = currentUser.name;
-                document.getElementById('user-role').textContent = 'Patient';
-            } else if (currentUser.type === 'doctor') {
-                nav.innerHTML = `
-                    <a href="#schedule" class="sidebar-link active" data-page="schedule">
-                        <i class="fa fa-calendar-check-o"></i>
-                        <span>My Schedule</span>
-                    </a>
-                `;
-                userInfo.classList.remove('hidden');
-                logoutBtn.classList.remove('hidden');
-                document.getElementById('user-name').textContent = currentUser.name;
-                document.getElementById('user-role').textContent = 'Doctor — ' + currentUser.specialty;
-            }
-
-            document.querySelectorAll('#sidebar-nav a').forEach(link => {
-                link.addEventListener('click', e => {
-                    e.preventDefault();
-                    document.querySelectorAll('#sidebar-nav a').forEach(l => l.classList.remove('active'));
-                    link.classList.add('active');
-                    const page = link.getAttribute('data-page');
-                    if (page === 'login') renderLoginPage();
-                    else if (page === 'book') renderBookPage();
-                    else if (page === 'appointments') renderAppointmentsPage();
-                    else if (page === 'schedule') renderSchedulePage();
-                });
-            });
-        }
-
-        // =====================================================
-        // LOGIN / REGISTER PAGE
-        // =====================================================
-        async function renderLoginPage() {
-            currentUser = null;
-            renderNav();
-            const content = document.getElementById('page-content');
-            const doctors = await getDoctors();
-            
-            content.innerHTML = `
-                <div class="max-w-md mx-auto mt-8">
-                    <div class="bg-white rounded-xl card-shadow p-6 md:p-8">
-                        <h2 class="text-2xl font-bold text-center mb-6 text-primary">Welcome</h2>
-                        
-                        <!-- Tabs -->
-                        <div class="flex border-b border-gray-200 mb-6">
-                            <button class="tab-btn active" data-tab="patient-login">Patient Login</button>
-                            <button class="tab-btn" data-tab="register">Create Account</button>
-                            <button class="tab-btn" data-tab="doctor-login">Doctor Login</button>
-                        </div>
-                        
-                        <!-- Patient Login -->
-                        <div id="patient-login" class="tab-content">
-                            <h3 class="text-lg font-medium mb-4">Patient Login</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                    <input type="email" id="login-email" class="form-input" placeholder="Enter your email">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                                    <input type="password" id="login-password" class="form-input" placeholder="Enter your password">
-                                </div>
-                                <button id="login-btn" class="btn btn-primary w-full mt-2">Log In</button>
-                            </div>
-                        </div>
-                        
-                        <!-- Register -->
-                        <div id="register" class="tab-content hidden">
-                            <h3 class="text-lg font-medium mb-4">Create Patient Account</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                                    <input type="text" id="reg-name" class="form-input" placeholder="Your full name">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                    <input type="email" id="reg-email" class="form-input" placeholder="Enter your email">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                                    <input type="password" id="reg-password" class="form-input" placeholder="At least 6 characters">
-                                </div>
-                                <button id="register-btn" class="btn btn-secondary w-full mt-2">Create Account</button>
-                            </div>
-                        </div>
-                        
-                        <!-- Doctor Login -->
-                        <div id="doctor-login" class="tab-content hidden">
-                            <h3 class="text-lg font-medium mb-4">Doctor Login</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                    <input type="email" id="doctor-email" class="form-input" placeholder="Your work email">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                                    <input type="password" id="doctor-password" class="form-input" placeholder="Enter password">
-                                </div>
-                                <div class="text-xs text-gray-500 bg-gray-50 p-2 rounded mb-2">
-                                    <strong>Sample Accounts:</strong><br>
-                                    Dr. Ana Reyes → doctor@clinic.com / doctor123<br>
-                                    Dr. Juan Dela Cruz → dentist@clinic.com / dentist123
-                                </div>
-                                <button id="doctor-login-submit" class="btn btn-primary w-full mt-2">Log In as Doctor</button>
-                            </div>
-                        </div>
-                    </div>
+</div>
+<!-- ======================================
+     🏠 DASHBOARD — PUTI NA WALANG LARAWAN
+     ====================================== -->
+<div id="userDashboard" class="hidden min-h-screen flex">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-blue-900 text-white hidden md:block">
+        <div class="p-4">
+            <div class="flex items-center gap-3 mb-8 mt-2">
+                <i class="fa-solid fa-heart-pulse text-2xl text-red-400"></i>
+                <span class="font-bold text-lg">Clinic</span>
+            </div>
+            <nav class="space-y-1">
+                <a href="#" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg text-white">
+                    <i class="fa-solid fa-house w-5 text-center"></i> Dashboard
+                </a>
+                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100">
+                    <i class="fa-solid fa-calendar-check w-5 text-center"></i> Aking Pagpapalista
+                </a>
+                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" onclick="logoutSystem()">
+                    <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Log out
+                </a>
+            </nav>
+        </div>
+    </aside>
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-6 bg-gray-50"> <!-- ✅ PUTING BACKGROUND -->
+        <div class="dashboard-card p-4 mb-6 flex justify-between items-center fade-in">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Kamusta, <span id="displayName"></span>!</h2>
+                <p class="text-gray-500 text-sm" id="displayRole"></p>
+            </div>
+            <button onclick="logoutSystem()" class="md:hidden bg-red-500 text-white px-3 py-2 rounded-lg text-sm">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+        </div>
+        <!-- Book Appointment Form -->
+        <div class="dashboard-card p-6 mb-6 fade-in">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">📅 Magpa-Palista sa Nars</h3>
+            <div class="grid md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-gray-600 text-sm font-medium mb-1">Petsa</label>
+                    <input type="date" id="aptDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-            `;
-
-            // Tab switching
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-                    document.getElementById(btn.dataset.tab).classList.remove('hidden');
-                });
-            });
-
-            // Patient Login
-            document.getElementById('login-btn').addEventListener('click', async () => {
-                const email = document.getElementById('login-email').value.trim();
-                const password = document.getElementById('login-password').value;
-                
-                if (!email || !password) {
-                    showToast('Please fill in all fields.', 'Missing Information', 'fa-exclamation-circle');
-                    return;
-                }
-                
-                const patient = await loginPatient(email, password);
-                if (patient) {
-                    currentUser = patient;
-                    showToast(`Welcome back, ${patient.name}!`, 'Login Successful', 'fa-check-circle');
-                    renderBookPage();
-                } else {
-                    showToast('Invalid email or password.', 'Login Failed', 'fa-times-circle');
-                }
-            });
-
-            // Register
-            document.getElementById('register-btn').addEventListener('click', async () => {
-                const name = document.getElementById('reg-name').value.trim();
-                const email = document.getElementById('reg-email').value.trim();
-                const password = document.getElementById('reg-password').value;
-                
-                if (!name || !email || !password) {
-                    showToast('Please fill in all fields.', 'Missing Information', 'fa-exclamation-circle');
-                    return;
-                }
-                if (!email.includes('@') || !email.includes('.')) {
-                    showToast('Please enter a valid email address.', 'Invalid Email', 'fa-exclamation-circle');
-                    return;
-                }
-                if (password.length < 6) {
-                    showToast('Password must be at least 6 characters.', 'Weak Password', 'fa-exclamation-triangle');
-                    return;
-                }
-                
-                try {
-                    await registerPatient(name, email, password);
-                    showToast('Account created successfully! You may now log in.', 'Account Created', 'fa-check-circle');
-                    document.querySelector('[data-tab="patient-login"]').click();
-                } catch (e) {
-                    showToast(e.message || 'Failed to create account.', 'Error', 'fa-exclamation-circle');
-                }
-            });
-
-            // Doctor Login
-            document.getElementById('doctor-login-submit').addEventListener('click', async () => {
-                const email = document.getElementById('doctor-email').value.trim();
-                const password = document.getElementById('doctor-password').value;
-                
-                if (!email || !password) {
-                    showToast('Please enter email and password.', 'Missing Information', 'fa-exclamation-circle');
-                    return;
-                }
-                
-                const doctor = await loginDoctor(email, password);
-                if (doctor) {
-                    currentUser = doctor;
-                    await ensureSlotsForDoctor(doctor.doctorId);
-                    showToast(`Welcome, Dr. ${doctor.name.split(' ')[1]}!`, 'Access Granted', 'fa-user-md');
-                    renderSchedulePage();
-                } else {
-                    showToast('Invalid doctor credentials.', 'Login Failed', 'fa-times-circle');
-                }
-            });
-        }
-
-        // =====================================================
-        // BOOK APPOINTMENT PAGE
-        // =====================================================
-        async function renderBookPage() {
-            if (!currentUser || currentUser.type !== 'patient') return renderLoginPage();
-            renderNav();
-            selectedDoctorId = null;
-            selectedSlotId = null;
-            
-            const content = document.getElementById('page-content');
-            const doctors = await getDoctors();
-            const specialties = [...new Set(doctors.map(d => d.specialty))];
-            
-            content.innerHTML = `
-                <div class="space-y-6">
-                    <div class="bg-white rounded-xl card-shadow p-6">
-                        <h2 class="text-xl font-bold mb-6 text-primary">Book an Appointment</h2>
-                        
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Specialty</label>
-                            <select id="specialty-filter" class="form-input mb-4">
-                                <option value="all">All Specialties</option>
-                                ${specialties.map(s => `<option value="${s}">${s}</option>`).join('')}
-                            </select>
-                        </div>
-                        
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Select a Doctor</label>
-                            <div id="doctor-list" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                ${doctors.map(d => `
-                                    <div class="doctor-card border rounded-lg p-4 cursor-pointer hover:border-primary hover:bg-primary/5 transition-all" data-doctor-id="${d.id}" data-specialty="${d.specialty}">
-                                        <h3 class="font-semibold text-lg">${d.name}</h3>
-                                        <p class="text-sm text-gray-500">${d.specialty}</p>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div id="slots-section" class="bg-white rounded-xl card-shadow p-6 hidden">
-                        <h3 class="text-lg font-semibold mb-4">Available Time Slots</h3>
-                        <p id="selected-doctor-name" class="text-gray-600 mb-4"></p>
-                        <div id="slots-container" class="space-y-4"></div>
-                        <button id="book-selected-btn" class="btn btn-secondary mt-6 hidden">Book Selected Slot</button>
-                    </div>
+                <div>
+                    <label class="block text-gray-600 text-sm font-medium mb-1">Oras</label>
+                    <input type="time" id="aptTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-            `;
-
-            document.getElementById('specialty-filter').addEventListener('change', e => {
-                const val = e.target.value;
-                document.querySelectorAll('.doctor-card').forEach(card => {
-                    if (val === 'all' || card.dataset.specialty === val) {
-                        card.classList.remove('hidden');
-                    } else {
-                        card.classList.add('hidden');
-                    }
-                });
-            });
-
-            document.querySelectorAll('.doctor-card').forEach(card => {
-                card.addEventListener('click', async () => {
-                    document.querySelectorAll('.doctor-card').forEach(c => {
-                        c.classList.remove('border-primary', 'bg-primary/5');
-                        c.classList.add('border-gray-200');
-                    });
-                    card.classList.remove('border-gray-200');
-                    card.classList.add('border-primary', 'bg-primary/5');
-                    
-                    selectedDoctorId = card.dataset.doctorId;
-                    selectedSlotId = null;
-                    const doctors = await getDoctors();
-                    const doctor = doctors.find(d => String(d.id) === String(selectedDoctorId));
-                    
-                    document.getElementById('slots-section').classList.remove('hidden');
-                    document.getElementById('selected-doctor-name').textContent = `${doctor.name} — ${doctor.specialty}`;
-                    await loadSlots();
-                });
-            });
-
-            document.getElementById('book-selected-btn').addEventListener('click', async () => {
-                if (!selectedSlotId) return;
-                const code = await bookAppointment(currentUser.id, selectedDoctorId, selectedSlotId);
-                if (code) {
-                    showToast(`Appointment confirmed! Confirmation code: ${code}`, 'Booking Successful', 'fa-check-circle');
-                    await loadSlots();
-                    document.getElementById('book-selected-btn').classList.add('hidden');
-                    selectedSlotId = null;
-                } else {
-                    showToast('Sorry, this slot has already been taken.', 'Booking Failed', 'fa-times-circle');
-                }
-            });
-        }
-
-        async function loadSlots() {
-            const slots = await getAvailableSlots(selectedDoctorId);
-            const container = document.getElementById('slots-container');
-            selectedSlotId = null;
-            document.getElementById('book-selected-btn').classList.add('hidden');
-            
-            if (!slots.length) {
-                container.innerHTML = `<p class="text-gray-500 italic">No available slots for this doctor in the coming days.</p>`;
-                return;
-            }
-
-            const grouped = {};
-            slots.forEach(s => {
-                if (!grouped[s.date]) grouped[s.date] = [];
-                grouped[s.date].push(s);
-            });
-
-            container.innerHTML = Object.entries(grouped).map(([date, slots]) => `
-                <div class="border-b pb-3">
-                    <h4 class="font-medium text-gray-700 mb-2">${formatDate(date)}</h4>
-                    <div class="flex flex-wrap gap-2">
-                        ${slots.map(slot => `
-                            <button class="slot-btn available" data-slot-id="${slot.id}" data-date="${date}" data-time="${slot.time}">
-                                ${slot.time}
-                            </button>
-                        `).join('')}
+                <div>
+                    <label class="block text-gray-600 text-sm font-medium mb-1">Uri ng Pagbisita</label>
+                    <select id="aptType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option>General Consultation</option>
+                        <option>First Aid/ Minor Injury</option>
+                        <option>Headache</option>
+                        <option>Fever / Flu Symptoms</option>
+                        <option>Stomach/ Abdomial pain</option>
+                        <option>Medicinne Request</option>
+                        <option>Other Medical concern</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-4">
+                <label class="block text-gray-600 text-sm font-medium mb-1">Layunin / Sintomas</label>
+                <textarea id="aptReason" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ilarawan ang iyong nararamdaman o dahilan ng pagbisita..."></textarea>
+            </div>
+            <button onclick="submitAppointment()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-all">
+                <i class="fa-solid fa-paper-plane mr-2"></i> Ipadala ang Kahilingan
+            </button>
+        </div>
+        <!-- My Appointments Table -->
+        <div class="dashboard-card p-6 fade-in">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">📋 Aking Mga Kahilingan</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 border-b">
+                            <th class="py-2 px-2">#</th>
+                            <th class="py-2 px-2">Petsa</th>
+                            <th class="py-2 px-2">Oras</th>
+                            <th class="py-2 px-2">Uri</th>
+                            <th class="py-2 px-2">Layunin</th>
+                            <th class="py-2 px-2">Katayuan</th>
+                        </tr>
+                    </thead>
+                    <tbody id="myAppointmentsTable">
+                        <tr><td colspan="6" class="py-4 text-center text-gray-400 italic">Wala pang naipadalang kahilingan.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+<!-- ======================================
+     👩‍⚕️ NURSE DASHBOARD — PUTI NA WALANG LARAWAN
+     ====================================== -->
+<div id="nurseDashboard" class="hidden min-h-screen flex">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-blue-900 text-white hidden md:block">
+        <div class="p-4">
+            <div class="flex items-center gap-3 mb-8 mt-2">
+                <i class="fa-solid fa-user-nurse text-2xl text-yellow-400"></i>
+                <div>
+                    <span class="font-bold text-lg">NURSE PANEL</span>
+                    <p class="text-xs text-blue-200">Pamamahala ng Klinika</p>
+                </div>
+            </div>
+            <nav class="space-y-1">
+                <a href="#" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg text-white">
+                    <i class="fa-solid fa-chart-pie w-5 text-center"></i> Dashboard
+                </a>
+                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100">
+                    <i class="fa-solid fa-calendar-check w-5 text-center"></i> Lahat ng Kahilingan
+                </a>
+                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" onclick="logoutSystem()">
+                    <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Log out
+                </a>
+            </nav>
+        </div>
+    </aside>
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-6 bg-gray-50"> <!-- ✅ PUTING BACKGROUND -->
+        <!-- Top Header -->
+        <div class="dashboard-card p-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 fade-in">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                    <i class="fa-solid fa-user-nurse text-blue-700 text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800"> Lupong ng Nars</h2>
+                    <p class="text-gray-500 text-sm">Pamahalaan ang lahat ng kahilingan sa klinika</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-2">
+                    <span class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                    <span id="pendingBadge">0</span> Nakabinbin
+                </span>
+                <button onclick="logoutSystem()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all">
+                    <i class="fa-solid fa-right-from-bracket mr-1"></i> Lumabas
+                </button>
+            </div>
+        </div>
+        <!-- 📊 STATISTICS CARDS -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 fade-in">
+            <div class="stat-card bg-blue-500 text-white p-4 shadow-md">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-blue-100 text-sm">Bagong Kahilingan</p>
+                        <p class="text-3xl font-bold" id="statNew">0</p>
                     </div>
+                    <i class="fa-solid fa-calendar-plus text-3xl text-blue-200"></i>
                 </div>
-            `).join('');
-
-            container.querySelectorAll('.slot-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    container.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
-                    btn.classList.add('selected');
-                    selectedSlotId = parseInt(btn.dataset.slotId);
-                    document.getElementById('book-selected-btn').classList.remove('hidden');
-                });
-            });
-        }
-
-        // =====================================================
-        // PATIENT'S APPOINTMENTS PAGE
-        // =====================================================
-        async function renderAppointmentsPage() {
-            if (!currentUser || currentUser.type !== 'patient') return renderLoginPage();
-            renderNav();
-            
-            const appointments = await getPatientAppointments(currentUser.id);
-            const content = document.getElementById('page-content');
-            
-            content.innerHTML = `
-                <div class="bg-white rounded-xl card-shadow p-6">
-                    <h2 class="text-xl font-bold mb-6 text-primary">My Appointments</h2>
-                    ${!appointments.length ? `
-                        <div class="text-center py-10 text-gray-500">
-                            <i class="fa fa-calendar-o text-4xl mb-4"></i>
-                            <p>You have no upcoming appointments.</p>
-                            <a href="#book" class="text-primary font-medium mt-2 inline-block" onclick="renderBookPage()">Book your first appointment</a>
-                        </div>
-                    ` : `
-                        <div class="overflow-x-auto">
-                            <table class="w-full border-collapse">
-                                <thead>
-                                    <tr class="bg-gray-50 border-b">
-                                        <th class="text-left p-3 font-semibold text-sm">Confirmation #</th>
-                                        <th class="text-left p-3 font-semibold text-sm">Doctor</th>
-                                        <th class="text-left p-3 font-semibold text-sm">Date</th>
-                                        <th class="text-left p-3 font-semibold text-sm">Time</th>
-                                        <th class="text-left p-3 font-semibold text-sm">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${appointments.map(a => `
-                                        <tr class="border-b hover:bg-gray-50">
-                                            <td class="p-3 font-mono text-sm">${a.code}</td>
-                                            <td class="p-3">
-                                                <div class="font-medium">${a.doctorName}</div>
-                                                <div class="text-xs text-gray-500">${a.specialty}</div>
-                                            </td>
-                                            <td class="p-3">${formatDate(a.date)}</td>
-                                            <td class="p-3">${a.time}</td>
-                                            <td class="p-3">
-                                                <button class="btn btn-danger text-xs py-1 px-2 cancel-btn" data-code="${a.code}">Cancel</button>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    `}
-                </div>
-            `;
-
-            document.querySelectorAll('.cancel-btn').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const code = btn.dataset.code;
-                    if (confirm('Are you sure you want to cancel this appointment?')) {
-                        await cancelAppointment(code);
-                        showToast('Appointment cancelled successfully.', 'Cancelled', 'fa-info-circle');
-                        renderAppointmentsPage();
-                    }
-                });
-            });
-        }
-
-        // =====================================================
-        // 🔑 DOCTOR'S SCHEDULE PAGE — SARILI LANG ANG NAKIKITA
-        // =====================================================
-        async function renderSchedulePage() {
-            if (!currentUser || currentUser.type !== 'doctor') return renderLoginPage();
-            renderNav();
-            
-            const appointments = await getDoctorAppointments(currentUser.doctorId);
-            const content = document.getElementById('page-content');
-            
-            content.innerHTML = `
-                <div class="bg-white rounded-xl card-shadow p-6">
-                    <div class="flex justify-between items-start mb-6">
-                        <div>
-                            <h2 class="text-xl font-bold text-primary">${currentUser.name}</h2>
-                            <p class="text-gray-500">${currentUser.specialty} — My Schedule Only</p>
-                        </div>
-                        <button id="refresh-btn" class="btn btn-outline text-sm">
-                            <i class="fa fa-refresh mr-1"></i> Refresh
-                        </button>
+            </div>
+            <div class="stat-card bg-yellow-500 text-white p-4 shadow-md">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-yellow-100 text-sm">Naghihintay</p>
+                        <p class="text-3xl font-bold" id="statPending">0</p>
                     </div>
-                    
-                    ${!appointments.length ? `
-                        <div class="text-center py-10 text-gray-500">
-                            <i class="fa fa-calendar-check-o text-4xl mb-4"></i>
-                            <p>You have no scheduled appointments yet.</p>
-                            <p class="text-sm mt-2">Only your own appointments appear here.</p>
-                        </div>
-                    ` : `
-                        <div class="overflow-x-auto">
-                            <table class="w-full border-collapse">
-                                <thead>
-                                    <tr class="bg-gray-50 border-b">
-                                        <th class="text-left p-3 font-semibold text-sm">Patient Name</th>
-                                        <th class="text-left p-3 font-semibold text-sm">Email</th>
-                                        <th class="text-left p-3 font-semibold text-sm">Date</th>
-                                        <th class="text-left p-3 font-semibold text-sm">Time</th>
-                                        <th class="text-left p-3 font-semibold text-sm">Reference #</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${appointments.map(a => `
-                                        <tr class="border-b hover:bg-gray-50">
-                                            <td class="p-3 font-medium">${a.patientName}</td>
-                                            <td class="p-3 text-sm">${a.patientEmail}</td>
-                                            <td class="p-3">${formatDate(a.date)}</td>
-                                            <td class="p-3">${a.time}</td>
-                                            <td class="p-3 font-mono text-xs">${a.code}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    `}
+                    <i class="fa-solid fa-clock text-3xl text-yellow-200"></i>
                 </div>
-            `;
-
-            document.getElementById('refresh-btn').addEventListener('click', renderSchedulePage);
-        }
-
-        // =====================================================
-        // GLOBAL INITIALIZATION
-        // =====================================================
-        document.getElementById('logout-btn').addEventListener('click', async () => {
-            await auth.signOut();
-            currentUser = null;
-            showToast('You have been logged out.', 'Logged Out', 'fa-sign-out');
-            renderLoginPage();
+            </div>
+            <div class="stat-card bg-green-500 text-white p-4 shadow-md">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-100 text-sm">Tinanggap</p>
+                        <p class="text-3xl font-bold" id="statApproved">0</p>
+                    </div>
+                    <i class="fa-solid fa-check-circle text-3xl text-green-200"></i>
+                </div>
+            </div>
+            <div class="stat-card bg-red-500 text-white p-4 shadow-md">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-red-100 text-sm">Tinanggihan</p>
+                        <p class="text-3xl font-bold" id="statRejected">0</p>
+                    </div>
+                    <i class="fa-solid fa-times-circle text-3xl text-red-200"></i>
+                </div>
+            </div>
+        </div>
+        <!-- ✨ SEARCH BAR — HANAPIN ANG PASYENTE AT LALABAS ANG KASAYSAYAN -->
+        <div class="dashboard-card p-4 mb-6 fade-in">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">🔍 Hanapin ang Kasaysayan ng Pasyente</h3>
+            <div class="flex flex-col md:flex-row gap-3">
+                <input type="text" id="searchPatientName" placeholder="I-type ang pangalan ng pasyente..." 
+                    class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="searchPatientHistory()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-all">
+                    <i class="fa-solid fa-magnifying-glass mr-2"></i> Hanapin
+                </button>
+            </div>
+            <!-- ✨ LALABAS DITO ANG KASAYSAYAN PAGKATAPOS HANAPIN -->
+            <div id="patientHistoryResult" class="mt-4 hidden">
+                <h4 class="font-bold text-gray-700 mb-2">📋 Kasaysayan ng Pagpapalista:</h4>
+                <div class="history-panel border rounded-lg overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="py-2 px-3 text-left">#</th>
+                                <th class="py-2 px-3 text-left">Petsa</th>
+                                <th class="py-2 px-3 text-left">Oras</th>
+                                <th class="py-2 px-3 text-left">Uri</th>
+                                <th class="py-2 px-3 text-left">Sintomas</th>
+                                <th class="py-2 px-3 text-left">Katayuan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientHistoryTable">
+                            <!-- Lalabas dito ang resulta -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- 📋 APPOINTMENTS TABLE -->
+        <div class="dashboard-card p-6 fade-in">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
+                <h3 class="text-lg font-bold text-gray-800">📋 LAHAT ng Kahilingan sa Klinika</h3>
+                <div class="flex gap-2">
+                    <select id="filterRole" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="all">Lahat ng Tauhan</option>
+                        <option value="Student">Student</option>
+                        <option value="Teacher">Teacher</option>
+                        <option value="Staff">Staff</option>
+                    </select>
+                    <select id="filterStatus" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="all">Lahat ng Katayuan</option>
+                        <option value="pending">⏳ Naghihintay</option>
+                        <option value="approved">✅ Tinanggap</option>
+                        <option value="rejected">❌ Tinanggihan</option>
+                    </select>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-600 border-b-2 border-gray-100">
+                            <th class="py-3 px-3 font-semibold">#</th>
+                            <th class="py-3 px-3 font-semibold">Pangalan</th>
+                            <th class="py-3 px-3 font-semibold">Tauhan</th>
+                            <th class="py-3 px-3 font-semibold">Petsa</th>
+                            <th class="py-3 px-3 font-semibold">Oras</th>
+                            <th class="py-3 px-3 font-semibold">Uri ng Bisita</th>
+                            <th class="py-3 px-3 font-semibold">Sintomas / Sakit</th>
+                            <th class="py-3 px-3 font-semibold">Katayuan</th>
+                            <th class="py-3 px-3 font-semibold text-center">Gawin</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allAppointmentsTable">
+                        <tr><td colspan="9" class="py-8 text-center text-gray-400 italic">Wala pang kahilingan mula sa sinuman.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+<script>
+// === DATA STORAGE ===
+const STORAGE_USERS = 'clinicUsers_v3';
+const STORAGE_APTS = 'clinicAppointments_v3';
+let currentUser = null;
+function getUsers() { return JSON.parse(localStorage.getItem(STORAGE_USERS) || '[]'); }
+function saveUsers(arr) { localStorage.setItem(STORAGE_USERS, JSON.stringify(arr)); }
+function getAppointments() { return JSON.parse(localStorage.getItem(STORAGE_APTS) || '[]'); }
+function saveAppointments(arr) { localStorage.setItem(STORAGE_APTS, JSON.stringify(arr)); }
+// === DEFAULT NURSE ACCOUNT ===
+function ensureNurseExists() {
+    let users = getUsers();
+    if (!users.find(u => u.role === 'nurse')) {
+        users.push({
+            name: 'Nars ng Paaralan',
+            email: 'nurse@school.ph',
+            password: 'nurse123',
+            role: 'nurse'
         });
+        saveUsers(users);
+    }
+}
+// === SWITCH AUTH TABS ===
+function showAuthTab(tab) {
+    const tabLogin = document.getElementById('tabLogin');
+    const tabReg = document.getElementById('tabRegister');
+    const formLogin = document.getElementById('formLogin');
+    const formReg = document.getElementById('formRegister');
+    if (tab === 'login') {
+        tabLogin.classList.add('tab-active'); tabLogin.classList.remove('text-gray-500');
+        tabReg.classList.remove('tab-active'); tabReg.classList.add('text-gray-500');
+        formLogin.classList.remove('hidden'); formReg.classList.add('hidden');
+    } else {
+        tabReg.classList.add('tab-active'); tabReg.classList.remove('text-gray-500');
+        tabLogin.classList.remove('tab-active'); tabLogin.classList.add('text-gray-500');
+        formReg.classList.remove('hidden'); formLogin.classList.add('hidden');
+    }
+    document.getElementById('authMsg').textContent = '';
+}
+// === REGISTER ===
+function registerUser() {
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim().toLowerCase();
+    const pass = document.getElementById('regPass').value;
+    const role = document.getElementById('regRole').value;
+    const msg = document.getElementById('authMsg');
+    if (!name || !email || !pass) {
+        msg.textContent = '⚠️ Punan ang lahat ng patlang!'; msg.className = 'mt-4 text-center font-medium text-orange-500'; return;
+    }
+    if (pass.length < 6) {
+        msg.textContent = '⚠️ Hindi bababa sa 6 titik ang lihim na salita!'; msg.className = 'mt-4 text-center font-medium text-orange-500'; return;
+    }
+    let users = getUsers();
+    if (users.find(u => u.email === email)) {
+        msg.textContent = '❌ Mayroon nang gumagamit ng email na ito!'; msg.className = 'mt-4 text-center font-medium text-red-500'; return;
+    }
+    users.push({ name, email, password: pass, role });
+    saveUsers(users);
+    msg.textContent = '✅ Matagumpay! Maaari ka nang Pumasok.'; msg.className = 'mt-4 text-center font-medium text-green-500';
+    setTimeout(() => showAuthTab('login'), 1500);
+}
+// === LOGIN ===
+function loginUser() {
+    const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+    const pass = document.getElementById('loginPass').value;
+    const msg = document.getElementById('authMsg');
+    const users = getUsers();
+    const user = users.find(u => u.email === email && u.password === pass);
+    if (!user) {
+        msg.textContent = '❌ Hindi Tama ang Email o Lihim na Salita!'; msg.className = 'mt-4 text-center font-medium text-red-500'; return;
+    }
+    currentUser = user;
+    openDashboard();
+}
+// === OPEN DASHBOARD BASED ON ROLE ===
+function openDashboard() {
+    document.getElementById('authSection').classList.add('hidden');
+    const role = currentUser.role;
+    if (role === 'nurse') {
+        document.getElementById('nurseDashboard').classList.remove('hidden');
+        renderAllAppointments();
+    } else {
+        document.getElementById('userDashboard').classList.remove('hidden');
+        document.getElementById('displayName').textContent = currentUser.name;
+        const labels = { Student: '🎓 Mag-aaral', Teacher: '📖 Guro', Staff: '🏛️ Kawani' };
+        document.getElementById('displayRole').textContent = labels[role];
+        renderMyAppointments();
+    }
+}
+// === SUBMIT APPOINTMENT ===
+function submitAppointment() {
+    const date = document.getElementById('aptDate').value;
+    const time = document.getElementById('aptTime').value;
+    const type = document.getElementById('aptType').value;
+    const reason = document.getElementById('aptReason').value.trim();
+    if (!date || !time || !reason) {
+        alert('⚠️ Punan ang lahat ng patlang!'); return;
+    }
+    let apts = getAppointments();
+    apts.push({
+        id: Date.now(),
+        userId: currentUser.email,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        date, time, type, reason,
+        status: 'pending'
+    });
+    saveAppointments(apts);
+    alert('✅ Matagumpay na naipadala sa Nars!');
+    document.getElementById('aptDate').value = '';
+    document.getElementById('aptTime').value = '';
+    document.getElementById('aptReason').value = '';
+    renderMyAppointments();
+}
+// === RENDER USER'S OWN APPOINTMENTS ===
+function renderMyAppointments() {
+    const apts = getAppointments().filter(a => a.userId === currentUser.email).sort((a,b) => b.id - a.id);
+    const tbody = document.getElementById('myAppointmentsTable');
+    if (apts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">Wala pang naipadalang kahilingan.</td></tr>';
+        return;
+    }
+    const statusClass = {
+        pending: 'status-pending',
+        approved: 'status-approved',
+        rejected: 'status-rejected'
+    };
+    const statusText = {
+        pending: '⏳ Naghihintay',
+        approved: '✅ Tinanggap',
+        rejected: '❌ Tinanggihan'
+    };
+    tbody.innerHTML = apts.map((a, i) => `
+        <tr class="border-b hover:bg-blue-50">
+            <td class="py-2 px-2">${i+1}</td>
+            <td class="py-2 px-2">${a.date}</td>
+            <td class="py-2 px-2">${a.time}</td>
+            <td class="py-2 px-2">${a.type}</td>
+            <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
+            <td class="py-2 px-2"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${statusClass[a.status]}">${statusText[a.status]}</span></td>
+        </tr>
+    `).join('');
+}
+// === UPDATE STATISTICS CARDS ===
+function updateStats() {
+    const apts = getAppointments();
+    const total = apts.length;
+    const pending = apts.filter(a => a.status === 'pending').length;
+    const approved = apts.filter(a => a.status === 'approved').length;
+    const rejected = apts.filter(a => a.status === 'rejected').length;
+    document.getElementById('statNew').textContent = total;
+    document.getElementById('statPending').textContent = pending;
+    document.getElementById('statApproved').textContent = approved;
+    document.getElementById('statRejected').textContent = rejected;
+    document.getElementById('pendingBadge').textContent = pending;
+}
+// === ✨ SEARCH PATIENT HISTORY ===
+function searchPatientHistory() {
+    const searchName = document.getElementById('searchPatientName').value.trim().toLowerCase();
+    const resultDiv = document.getElementById('patientHistoryResult');
+    const tableBody = document.getElementById('patientHistoryTable');
+    
+    if (!searchName) {
+        alert('⚠️ I-type muna ang pangalan ng pasyente!');
+        return;
+    }
 
-        document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('hidden');
-            sidebar.classList.toggle('fixed');
-            sidebar.classList.toggle('z-40');
-            sidebar.classList.toggle('inset-y-0');
-            sidebar.classList.toggle('left-0');
-        });
+    const allApts = getAppointments();
+    // Hanapin LAHAT ng appointment na tumutugma sa pangalan — KASAMA NA ANG MGA TINAPOS/TINANGGIHAN
+    const patientHistory = allApts.filter(a => 
+        a.userName && a.userName.toLowerCase().includes(searchName)
+    ).sort((a, b) => b.id - a.id); // Pinakabago sa una
 
-        // Auth state persistence — stay logged in across devices
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                const doc = await db.collection('patients').doc(user.uid).get();
-                if (doc.exists) {
-                    const data = doc.data();
-                    currentUser = { type: 'patient', id: user.uid, name: data.fullName, email: data.email };
-                    renderBookPage();
-                }
-            } else {
-                await initDoctors();
-                renderLoginPage();
-            }
-        });
-    </script>
+    resultDiv.classList.remove('hidden');
+
+    if (patientHistory.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">❌ Walang nakitang kasaysayan para sa pangalang ito.</td></tr>';
+        return;
+    }
+
+    const statusClass = {
+        pending: 'status-pending',
+        approved: 'status-approved',
+        rejected: 'status-rejected'
+    };
+    const statusText = {
+        pending: '⏳ Naghihintay',
+        approved: '✅ Tinanggap',
+        rejected: '❌ Tinanggihan'
+    };
+
+    tableBody.innerHTML = patientHistory.map((a, i) => `
+        <tr class="border-b hover:bg-blue-50">
+            <td class="py-2 px-3">${i+1}</td>
+            <td class="py-2 px-3">${a.date}</td>
+            <td class="py-2 px-3">${a.time}</td>
+            <td class="py-2 px-3">${a.type}</td>
+            <td class="py-2 px-3 max-w-xs truncate">${a.reason}</td>
+            <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${statusClass[a.status]}">${statusText[a.status]}</span></td>
+        </tr>
+    `).join('');
+}
+// === RENDER ALL APPOINTMENTS — NURSE ONLY ===
+function renderAllAppointments() {
+    let apts = getAppointments();
+    
+    // Apply filters
+    const roleFilter = document.getElementById('filterRole').value;
+    const statusFilter = document.getElementById('filterStatus').value;
+    
+    if (roleFilter !== 'all') apts = apts.filter(a => a.userRole === roleFilter);
+    if (statusFilter !== 'all') apts = apts.filter(a => a.status === statusFilter);
+    
+    apts.sort((a,b) => b.id - a.id);
+    
+    const tbody = document.getElementById('allAppointmentsTable');
+    // Update statistics cards
+    updateStats();
+    if (apts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400 italic">Wala pang kahilingan.</td></tr>';
+        return;
+    }
+    const roleIcon = { Student: '🎓 Mag-aaral', Teacher: '📖 Guro', Staff: '🏛️ Kawani' };
+    const statusClass = {
+        pending: 'status-pending',
+        approved: 'status-approved',
+        rejected: 'status-rejected'
+    };
+    const statusText = {
+        pending: 'Naghihintay',
+        approved: 'Tinanggap',
+        rejected: 'Tinanggihan'
+    };
+    tbody.innerHTML = apts.map((a, i) => `
+        <tr class="border-b border-gray-100">
+            <td class="py-3 px-3 font-medium">${i+1}</td>
+            <td class="py-3 px-3 font-semibold text-blue-800">${a.userName}</td>
+            <td class="py-3 px-3 text-sm">${roleIcon[a.userRole] || a.userRole}</td>
+            <td class="py-3 px-3">${a.date}</td>
+            <td class="py-3 px-3">${a.time}</td>
+            <td class="py-3 px-3 text-sm">${a.type}</td>
+            <td class="py-3 px-3 text-sm max-w-xs">${a.reason}</td>
+            <td class="py-3 px-3">
+                <span class="px-2 py-1 rounded text-xs font-semibold ${statusClass[a.status]}">${statusText[a.status]}</span>
+            </td>
+            <td class="py-3 px-3 text-center">
+                ${a.status === 'pending' ? `
+                    <button onclick="updateStatus(${a.id}, 'approved')" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold mr-1 transition-all" title="Tanggapin">✅ Tanggapin</button>
+                    <button onclick="updateStatus(${a.id}, 'rejected')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-semibold transition-all" title="Tanggihan">❌ Tanggihan</button>
+                ` : '<span class="text-gray-400 text-xs">—</span>'}
+            </td>
+        </tr>
+    `).join('');
+}
+// === UPDATE APPOINTMENT STATUS ===
+function updateStatus(id, status) {
+    let apts = getAppointments();
+    let idx = apts.findIndex(a => a.id === id);
+    if (idx !== -1) {
+        apts[idx].status = status;
+        saveAppointments(apts);
+        renderAllAppointments();
+    }
+}
+// === LOGOUT ===
+function logoutSystem() {
+    currentUser = null;
+    document.getElementById('userDashboard').classList.add('hidden');
+    document.getElementById('nurseDashboard').classList.add('hidden');
+    document.getElementById('authSection').classList.remove('hidden');
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPass').value = '';
+    document.getElementById('authMsg').textContent = '';
+    showAuthTab('login');
+}
+// === INIT ===
+ensureNurseExists();
+</script>
 </body>
 </html>

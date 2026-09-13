@@ -1,193 +1,192 @@
 <!DOCTYPE html>
-<html lang="tl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏫 Paaralang Klinika - Sistema ng Pagpapalista</title>
+    <title>🏫 School Clinic - Appointment System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         * { font-family: 'Inter', sans-serif; }
         
-        /* ==============================================
-           ✅ BACKGROUND LARAWAN — SA LOGIN PAGE LANG
-           ============================================== */
         .school-bg {
             background: linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.15)), 
-                        url('clinic.jpg'); /* ✅ ITO ANG LARAWAN MO */
+                        url('clinic.jpg');
             background-size: 100% auto;
             background-position: center;
             background-attachment: fixed;
             background-repeat: no-repeat;
         }
-        /* ✅ LOGIN FORM — TRANSPARENT PA RIN */
         .glass {
             background: rgba(255, 255, 255, 0.35);
-            backdrop-filter: blur(2px);
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            color: #000000 !important; /* ✅ ITIM NA TEKSTO — MALINAW */
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: #000000 !important;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.1);
+            transition: all 0.4s ease;
         }
-        /* ✅ DASHBOARD — PUTI NA AT HINDI TRANSPARENT */
+        .glass:hover {
+            box-shadow: 0 12px 50px rgba(0,0,0,0.15);
+            border-color: rgba(255,255,255,0.6);
+        }
         .dashboard-card {
-            background: #ffffff; /* ✅ PURONG PUTI */
+            background: #ffffff;
             border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+            transition: all 0.35s ease;
         }
-        
-        .sidebar {
-            background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
-            min-height: 100vh;
+        .dashboard-card:hover {
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+            transform: translateY(-2px);
         }
         .sidebar-link {
-            transition: all 0.2s ease;
-        }
-        .sidebar-link:hover, .sidebar-link.active {
-            background: rgba(255, 255, 255, 0.15);
-            border-left: 3px solid #fbbf24;
-        }
-        .stat-card {
-            border-radius: 12px;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .stat-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
-        }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ✨ IDINAGDAG: ANIMATION SA PAG-CLICK NG BUTTON */
-        button:active, .btn-click {
-            transform: scale(0.97);
-            transition: transform 0.1s ease;
-        }
-        button {
-            position: relative;
-            overflow: hidden;
-        }
-        button::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: radial-gradient(circle, rgba(255,255,255,0.25), transparent 60%);
-            transform: scale(0);
-            opacity: 0;
             transition: all 0.3s ease;
         }
-        button:active::after {
-            transform: scale(1.8);
-            opacity: 1;
-            transition: 0s;
+        .sidebar-link:hover, .sidebar-link.active {
+            background: rgba(255, 255, 255, 0.18);
+            border-left: 4px solid #fbbf24;
         }
-
+        .stat-card {
+            border-radius: 16px;
+            transition: all 0.35s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         .tab-active {
-            border-bottom: 2px solid #3b82f6;
+            border-bottom: 3px solid #3b82f6;
             color: #2563eb;
             font-weight: 600;
         }
         .status-pending { background: #fef08a; color: #854d0e; }
         .status-approved { background: #bbf7d0; color: #166534; }
         .status-rejected { background: #fecaca; color: #991b1b; }
-        .status-urgent { background: #fca5a5; color: #7f1d1d; }
-        table tbody tr { transition: background 0.15s; }
-        table tbody tr:hover { background: #eff6ff; }
-        /* ✅ TEKSTO SA LOGIN — ITIM AT MALINAW */
-        #authSection label,
-        #authSection h1,
-        #authSection p,
-        #authSection button,
-        #authSection input,
-        #authSection select {
-            color: #000000 !important;
-            font-weight: 600;
-        }
-        #authSection input::placeholder {
-            color: #444444;
-            font-weight: 500;
-        }
-        /* ✨ Kasaysayan Panel */
         .history-panel {
-            max-height: 400px;
+            max-height: 550px;
             overflow-y: auto;
+        }
+        .password-wrapper { position: relative; }
+        .eye-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #6b7280;
+        }
+        .password-wrapper input { padding-right: 40px !important; }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 4px rgba(251, 191, 36, 0.4); }
+            50% { box-shadow: 0 0 15px rgba(251, 191, 36, 0.7); }
+        }
+        .animate-pulse { animation: pulse-glow 1.5s ease-in-out infinite; }
+        .time-slot {
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+        .time-slot:hover:not(.taken) {
+            background-color: #dbeafe;
+            border-color: #3b82f6;
+            transform: scale(1.03);
+        }
+        .time-slot.taken {
+            background-color: #f3f4f6;
+            color: #9ca3af;
+            border-color: #e5e7eb;
+            cursor: not-allowed;
+            text-decoration: line-through;
+        }
+        .time-slot.selected {
+            background-color: #dbeafe;
+            border-color: #2563eb;
+            border-width: 2px;
+            font-weight: 600;
+            color: #1e40af;
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen"> <!-- ✅ BODY = PUTI NA, WALANG LARAWAN -->
-<!-- ======================================
-     🔐 PAHINA NG PAGPASOK — MAY LARAWAN
-     ====================================== -->
-<div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4"> <!-- ✅ LARAWAN DITO LANG -->
+<body class="bg-gray-50 min-h-screen">
+
+<!-- 🔐 LOGIN PAGE -->
+<div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4">
     <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
         <div class="text-center mb-8">
             <i class="fa-solid fa-heart-pulse text-4xl text-red-500 mb-2"></i>
             <h1 class="text-2xl font-bold text-gray-800">Clinic Appointment System</h1>
-            <p class="text-gray-500">Sistema ng Pagpapalista sa Klinika</p>
+            <p class="text-gray-500">School Clinic Appointment System</p>
         </div>
         <div class="flex mb-6 border-b border-gray-200">
-            <button id="tabLogin" class="flex-1 py-3 text-center tab-active transition-all" onclick="showAuthTab('login')">
-                <i class="fa-solid fa-right-to-bracket mr-2"></i> Pagpasok
+            <button id="tabLogin" class="flex-1 py-3 text-center tab-active" onclick="showAuthTab('login')">
+                <i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In
             </button>
-            <button id="tabRegister" class="flex-1 py-3 text-center text-gray-500 transition-all" onclick="showAuthTab('register')">
-                <i class="fa-solid fa-user-plus mr-2"></i> Lumikha ng Account
+            <button id="tabRegister" class="flex-1 py-3 text-center text-gray-500" onclick="showAuthTab('register')">
+                <i class="fa-solid fa-user-plus mr-2"></i> Create Account
             </button>
         </div>
-        <!-- 📋 FORM: PAGPASOK -->
+        <!-- LOGIN FORM -->
         <div id="formLogin">
             <div class="space-y-4">
                 <div>
                     <label class="block text-gray-700 font-medium mb-1">Email</label>
-                    <input type="email" id="loginEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="iyong@email.com">
+                    <input type="email" id="loginEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your@email.com">
                 </div>
                 <div>
-                    <label class="block text-gray-700 font-medium mb-1">Lihim na Salita</label>
-                    <input type="password" id="loginPass" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••">
+                    <label class="block text-gray-700 font-medium mb-1">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="loginPass" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="At least 6 characters">
+                        <i class="fa-solid fa-eye eye-icon" id="eyeLogin" onclick="togglePassword('loginPass', 'eyeLogin')"></i>
+                    </div>
                 </div>
-                <button onclick="loginUser()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-all">
-                    Pumasok
+                <button onclick="loginUser()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold">
+                    Sign In
                 </button>
             </div>
         </div>
-        <!-- 📝 FORM: PAGREHISTRO -->
+        <!-- REGISTER FORM -->
         <div id="formRegister" class="hidden">
             <div class="space-y-4">
                 <div>
-                    <label class="block text-gray-700 font-medium mb-1">Buong Pangalan</label>
+                    <label class="block text-gray-700 font-medium mb-1">Full Name</label>
                     <input type="text" id="regName" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Juan Dela Cruz">
                 </div>
                 <div>
                     <label class="block text-gray-700 font-medium mb-1">Email</label>
-                    <input type="email" id="regEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="iyong@email.com">
+                    <input type="email" id="regEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="your@email.com">
                 </div>
                 <div>
                     <label class="block text-gray-700 font-medium mb-1">Password</label>
-                    <input type="password" id="regPass" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Hindi bababa sa 6 na titik">
+                    <div class="password-wrapper">
+                        <input type="password" id="regPass" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="At least 6 characters">
+                        <i class="fa-solid fa-eye eye-icon" id="eyeReg" onclick="togglePassword('regPass', 'eyeReg')"></i>
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-gray-700 font-medium mb-1">Ikaw ay isang...</label>
+                    <label class="block text-gray-700 font-medium mb-1">You are a...</label>
                     <select id="regRole" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
                         <option value="Student"> 🎓 Student</option>
                         <option value="Teacher"> 📖 Teacher</option>
                         <option value="Staff"> 🏛️ Staff</option>
                     </select>
                 </div>
-                <button onclick="registerUser()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-all">
-                    Lumikha ng Account
+                <button onclick="registerUser()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold">
+                    Create Account
                 </button>
             </div>
         </div>
         <p id="authMsg" class="mt-4 text-center font-medium"></p>
     </div>
 </div>
-<!-- ======================================
-     🏠 DASHBOARD — PUTI NA WALANG LARAWAN
-     ====================================== -->
+
+<!-- 🏠 USER DASHBOARD -->
 <div id="userDashboard" class="hidden min-h-screen flex">
-    <!-- Sidebar -->
     <aside class="w-64 bg-blue-900 text-white hidden md:block">
         <div class="p-4">
             <div class="flex items-center gap-3 mb-8 mt-2">
@@ -199,284 +198,390 @@
                     <i class="fa-solid fa-house w-5 text-center"></i> Dashboard
                 </a>
                 <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100">
-                    <i class="fa-solid fa-calendar-check w-5 text-center"></i> Aking Pagpapalista
+                    <i class="fa-solid fa-calendar-check w-5 text-center"></i> My Appointments
                 </a>
                 <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" onclick="logoutSystem()">
-                    <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Log out
+                    <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Log Out
                 </a>
             </nav>
         </div>
     </aside>
-    <!-- Main Content -->
-    <main class="flex-1 p-4 md:p-6 bg-gray-50"> <!-- ✅ PUTING BACKGROUND -->
+    <main class="flex-1 p-4 md:p-6 bg-gray-50">
         <div class="dashboard-card p-4 mb-6 flex justify-between items-center fade-in">
             <div>
-                <h2 class="text-xl font-bold text-gray-800">Kamusta, <span id="displayName"></span>!</h2>
+                <h2 class="text-xl font-bold text-gray-800">Welcome, <span id="displayName"></span>!</h2>
                 <p class="text-gray-500 text-sm" id="displayRole"></p>
             </div>
             <button onclick="logoutSystem()" class="md:hidden bg-red-500 text-white px-3 py-2 rounded-lg text-sm">
                 <i class="fa-solid fa-right-from-bracket"></i>
             </button>
         </div>
-        <!-- Book Appointment Form -->
         <div class="dashboard-card p-6 mb-6 fade-in">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">📅 Magpa-Palista sa Nars</h3>
-            <div class="grid md:grid-cols-3 gap-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">📅 Book an Appointment</h3>
+            <div class="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label class="block text-gray-600 text-sm font-medium mb-1">Petsa</label>
-                    <input type="date" id="aptDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <label class="block text-gray-600 text-sm font-medium mb-1">Select Date (Monday–Friday only)</label>
+                    <input type="date" id="aptDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="loadAvailableTimeSlots()">
                 </div>
                 <div>
-                    <label class="block text-gray-600 text-sm font-medium mb-1">Oras</label>
-                    <input type="time" id="aptTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-gray-600 text-sm font-medium mb-1">Uri ng Pagbisita</label>
-                    <select id="aptType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option>General Consultation</option>
-                        <option>First Aid/ Minor Injury</option>
-                        <option>Headache</option>
-                        <option>Fever / Flu Symptoms</option>
-                        <option>Stomach/ Abdomial pain</option>
-                        <option>Medicinne Request</option>
-                        <option>Other Medical concern</option>
-                    </select>
+                    <label class="block text-gray-600 text-sm font-medium mb-1">Available Time Slot</label>
+                    <input type="hidden" id="aptTime">
+                    <div id="timeSlotsContainer" class="grid grid-cols-3 gap-2">
+                        <span class="text-gray-400 text-sm col-span-3">Select a date first...</span>
+                    </div>
                 </div>
             </div>
-            <div class="mt-4">
-                <label class="block text-gray-600 text-sm font-medium mb-1">Layunin / Sintomas</label>
-                <textarea id="aptReason" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ilarawan ang iyong nararamdaman o dahilan ng pagbisita..."></textarea>
+            <div class="mb-4">
+                <label class="block text-gray-600 text-sm font-medium mb-1">Visit Type</label>
+                <select id="aptType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option>General Consultation</option>
+                    <option>First Aid / Minor Injury</option>
+                    <option>Headache</option>
+                    <option>Fever / Flu Symptoms</option>
+                    <option>Stomach / Abdominal Pain</option>
+                    <option>Medicine Request</option>
+                    <option>Other Medical Concern</option>
+                </select>
             </div>
-            <button onclick="submitAppointment()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-all">
-                <i class="fa-solid fa-paper-plane mr-2"></i> Ipadala ang Kahilingan
+            <div>
+                <label class="block text-gray-600 text-sm font-medium mb-1">Purpose / Symptoms</label>
+                <textarea id="aptReason" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Describe your symptoms..."></textarea>
+            </div>
+            <button onclick="submitAppointment()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold">
+                <i class="fa-solid fa-paper-plane mr-2"></i> Submit Request
             </button>
         </div>
-        <!-- My Appointments Table -->
         <div class="dashboard-card p-6 fade-in">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">📋 Aking Mga Kahilingan</h3>
+            <h3 class="text-lg font-bold text-gray-800 mb-4">📋 My Appointments</h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-left text-gray-500 border-b">
                             <th class="py-2 px-2">#</th>
-                            <th class="py-2 px-2">Petsa</th>
-                            <th class="py-2 px-2">Oras</th>
-                            <th class="py-2 px-2">Uri</th>
-                            <th class="py-2 px-2">Layunin</th>
-                            <th class="py-2 px-2">Katayuan</th>
+                            <th class="py-2 px-2">Date</th>
+                            <th class="py-2 px-2">Time</th>
+                            <th class="py-2 px-2">Type</th>
+                            <th class="py-2 px-2">Purpose</th>
+                            <th class="py-2 px-2">Status</th>
                         </tr>
                     </thead>
                     <tbody id="myAppointmentsTable">
-                        <tr><td colspan="6" class="py-4 text-center text-gray-400 italic">Wala pang naipadalang kahilingan.</td></tr>
+                        <tr><td colspan="6" class="py-4 text-center text-gray-400 italic">No appointments yet.</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </main>
 </div>
-<!-- ======================================
-     👩‍⚕️ NURSE DASHBOARD — PUTI NA WALANG LARAWAN
-     ====================================== -->
+
+<!-- 👩‍⚕️ NURSE DASHBOARD -->
 <div id="nurseDashboard" class="hidden min-h-screen flex">
-    <!-- Sidebar -->
     <aside class="w-64 bg-blue-900 text-white hidden md:block">
         <div class="p-4">
             <div class="flex items-center gap-3 mb-8 mt-2">
                 <i class="fa-solid fa-user-nurse text-2xl text-yellow-400"></i>
                 <div>
                     <span class="font-bold text-lg">NURSE PANEL</span>
-                    <p class="text-xs text-blue-200">Pamamahala ng Klinika</p>
+                    <p class="text-xs text-blue-200">Clinic Management</p>
                 </div>
             </div>
             <nav class="space-y-1">
-                <a href="#" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg text-white">
+                <a href="#" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg text-white" id="navDashboard" onclick="showNurseTab('dashboard')">
                     <i class="fa-solid fa-chart-pie w-5 text-center"></i> Dashboard
                 </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100">
-                    <i class="fa-solid fa-calendar-check w-5 text-center"></i> Lahat ng Kahilingan
+                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" id="navHistory" onclick="showNurseTab('history')">
+                    <i class="fa-solid fa-clock-rotate-left w-5 text-center"></i> Appointment History
+                </a>
+                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" id="navAppointments" onclick="showNurseTab('appointments')">
+                    <i class="fa-solid fa-calendar-check w-5 text-center"></i> All Appointments
                 </a>
                 <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" onclick="logoutSystem()">
-                    <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Log out
+                    <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Log Out
                 </a>
             </nav>
         </div>
     </aside>
-    <!-- Main Content -->
-    <main class="flex-1 p-4 md:p-6 bg-gray-50"> <!-- ✅ PUTING BACKGROUND -->
-        <!-- Top Header -->
-        <div class="dashboard-card p-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 fade-in">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                    <i class="fa-solid fa-user-nurse text-blue-700 text-xl"></i>
+    <main class="flex-1 p-4 md:p-6 bg-gray-50">
+        <!-- DASHBOARD VIEW -->
+        <div id="nurseViewDashboard" class="fade-in">
+            <div class="dashboard-card p-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                        <i class="fa-solid fa-user-nurse text-blue-700 text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Nurse Dashboard</h2>
+                        <p class="text-gray-500 text-sm">Manage all clinic appointment requests</p>
+                    </div>
                 </div>
-                <div>
-                    <h2 class="text-xl font-bold text-gray-800"> Lupong ng Nars</h2>
-                    <p class="text-gray-500 text-sm">Pamahalaan ang lahat ng kahilingan sa klinika</p>
+                <div class="flex items-center gap-2">
+                    <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-2">
+                        <span class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                        <span id="pendingBadge">0</span> Pending
+                    </span>
+                    <button onclick="logoutSystem()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                        <i class="fa-solid fa-right-from-bracket mr-1"></i> Log Out
+                    </button>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-2">
-                    <span class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
-                    <span id="pendingBadge">0</span> Nakabinbin
-                </span>
-                <button onclick="logoutSystem()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all">
-                    <i class="fa-solid fa-right-from-bracket mr-1"></i> Lumabas
-                </button>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="stat-card bg-blue-500 text-white p-4">
+                    <div class="flex items-center justify-between">
+                        <div><p class="text-blue-100 text-sm">New Requests</p><p class="text-3xl font-bold" id="statNew">0</p></div>
+                        <i class="fa-solid fa-calendar-plus text-3xl text-blue-200"></i>
+                    </div>
+                </div>
+                <div class="stat-card bg-yellow-500 text-white p-4">
+                    <div class="flex items-center justify-between">
+                        <div><p class="text-yellow-100 text-sm">Pending</p><p class="text-3xl font-bold" id="statPending">0</p></div>
+                        <i class="fa-solid fa-clock text-3xl text-yellow-200"></i>
+                    </div>
+                </div>
+                <div class="stat-card bg-green-500 text-white p-4">
+                    <div class="flex items-center justify-between">
+                        <div><p class="text-green-100 text-sm">Approved</p><p class="text-3xl font-bold" id="statApproved">0</p></div>
+                        <i class="fa-solid fa-check-circle text-3xl text-green-200"></i>
+                    </div>
+                </div>
+                <div class="stat-card bg-red-500 text-white p-4">
+                    <div class="flex items-center justify-between">
+                        <div><p class="text-red-100 text-sm">Rejected</p><p class="text-3xl font-bold" id="statRejected">0</p></div>
+                        <i class="fa-solid fa-times-circle text-3xl text-red-200"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-card p-4 mb-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-3">🔍 Search Patient History</h3>
+                <div class="flex flex-col md:flex-row gap-3">
+                    <input type="text" id="searchPatientName" placeholder="Type patient name..." 
+                        class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button onclick="searchPatientHistory()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold">
+                        <i class="fa-solid fa-magnifying-glass mr-2"></i> Search
+                    </button>
+                </div>
+                <div id="patientHistoryResult" class="mt-4 hidden">
+                    <h4 class="font-bold text-gray-700 mb-2">📋 Appointment History:</h4>
+                    <div class="history-panel border rounded-lg overflow-hidden">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="py-2 px-3 text-left">#</th>
+                                    <th class="py-2 px-3 text-left">Date</th>
+                                    <th class="py-2 px-3 text-left">Time</th>
+                                    <th class="py-2 px-3 text-left">Type</th>
+                                    <th class="py-2 px-3 text-left">Symptoms</th>
+                                    <th class="py-2 px-3 text-left">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="patientHistoryTable"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
-        <!-- 📊 STATISTICS CARDS -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 fade-in">
-            <div class="stat-card bg-blue-500 text-white p-4 shadow-md">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-blue-100 text-sm">Bagong Kahilingan</p>
-                        <p class="text-3xl font-bold" id="statNew">0</p>
+
+        <!-- APPOINTMENT HISTORY VIEW -->
+        <div id="nurseViewHistory" class="hidden fade-in">
+            <div class="dashboard-card p-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
+                    <h3 class="text-lg font-bold text-gray-800">
+                        <i class="fa-solid fa-clock-rotate-left mr-2 text-blue-600"></i> Appointment History
+                        <span class="text-sm font-normal text-gray-500 ml-2">(Chronological Order)</span>
+                    </h3>
+                    <div class="flex gap-2">
+                        <button onclick="renderHistory(true)" class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+                            <i class="fa-solid fa-arrow-up-short-wide mr-1"></i> Oldest First
+                        </button>
+                        <button onclick="renderHistory(false)" class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+                            <i class="fa-solid fa-arrow-down-wide-short mr-1"></i> Newest First
+                        </button>
                     </div>
-                    <i class="fa-solid fa-calendar-plus text-3xl text-blue-200"></i>
                 </div>
-            </div>
-            <div class="stat-card bg-yellow-500 text-white p-4 shadow-md">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-yellow-100 text-sm">Naghihintay</p>
-                        <p class="text-3xl font-bold" id="statPending">0</p>
-                    </div>
-                    <i class="fa-solid fa-clock text-3xl text-yellow-200"></i>
-                </div>
-            </div>
-            <div class="stat-card bg-green-500 text-white p-4 shadow-md">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-green-100 text-sm">Tinanggap</p>
-                        <p class="text-3xl font-bold" id="statApproved">0</p>
-                    </div>
-                    <i class="fa-solid fa-check-circle text-3xl text-green-200"></i>
-                </div>
-            </div>
-            <div class="stat-card bg-red-500 text-white p-4 shadow-md">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-red-100 text-sm">Tinanggihan</p>
-                        <p class="text-3xl font-bold" id="statRejected">0</p>
-                    </div>
-                    <i class="fa-solid fa-times-circle text-3xl text-red-200"></i>
-                </div>
-            </div>
-        </div>
-        <!-- ✨ SEARCH BAR — HANAPIN ANG PASYENTE AT LALABAS ANG KASAYSAYAN -->
-        <div class="dashboard-card p-4 mb-6 fade-in">
-            <h3 class="text-lg font-bold text-gray-800 mb-3">🔍 Hanapin ang Kasaysayan ng Pasyente</h3>
-            <div class="flex flex-col md:flex-row gap-3">
-                <input type="text" id="searchPatientName" placeholder="I-type ang pangalan ng pasyente..." 
-                    class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button onclick="searchPatientHistory()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-all">
-                    <i class="fa-solid fa-magnifying-glass mr-2"></i> Hanapin
-                </button>
-            </div>
-            <!-- ✨ LALABAS DITO ANG KASAYSAYAN PAGKATAPOS HANAPIN -->
-            <div id="patientHistoryResult" class="mt-4 hidden">
-                <h4 class="font-bold text-gray-700 mb-2">📋 Kasaysayan ng Pagpapalista:</h4>
-                <div class="history-panel border rounded-lg overflow-hidden">
+                <div class="overflow-x-auto history-panel">
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="py-2 px-3 text-left">#</th>
-                                <th class="py-2 px-3 text-left">Petsa</th>
-                                <th class="py-2 px-3 text-left">Oras</th>
-                                <th class="py-2 px-3 text-left">Uri</th>
-                                <th class="py-2 px-3 text-left">Sintomas</th>
-                                <th class="py-2 px-3 text-left">Katayuan</th>
+                        <thead class="bg-gray-50">
+                            <tr class="text-left text-gray-600 border-b-2 border-gray-200">
+                                <th class="py-3 px-3 font-semibold text-center">#</th>
+                                <th class="py-3 px-3 font-semibold">Name</th>
+                                <th class="py-3 px-3 font-semibold">Role</th>
+                                <th class="py-3 px-3 font-semibold">Date</th>
+                                <th class="py-3 px-3 font-semibold">Time</th>
+                                <th class="py-3 px-3 font-semibold">Visit Type</th>
+                                <th class="py-3 px-3 font-semibold">Purpose</th>
+                                <th class="py-3 px-3 font-semibold text-center">Status</th>
                             </tr>
                         </thead>
-                        <tbody id="patientHistoryTable">
-                            <!-- Lalabas dito ang resulta -->
+                        <tbody id="historyTable">
+                            <tr><td colspan="8" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
-        <!-- 📋 APPOINTMENTS TABLE -->
-        <div class="dashboard-card p-6 fade-in">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
-                <h3 class="text-lg font-bold text-gray-800">📋 LAHAT ng Kahilingan sa Klinika</h3>
-                <div class="flex gap-2">
-                    <select id="filterRole" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="all">Lahat ng Tauhan</option>
-                        <option value="Student">Student</option>
-                        <option value="Teacher">Teacher</option>
-                        <option value="Staff">Staff</option>
-                    </select>
-                    <select id="filterStatus" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="all">Lahat ng Katayuan</option>
-                        <option value="pending">⏳ Naghihintay</option>
-                        <option value="approved">✅ Tinanggap</option>
-                        <option value="rejected">❌ Tinanggihan</option>
-                    </select>
+
+        <!-- ALL APPOINTMENTS VIEW -->
+        <div id="nurseViewAppointments" class="hidden fade-in">
+            <div class="dashboard-card p-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
+                    <h3 class="text-lg font-bold text-gray-800">📋 ALL Clinic Appointments</h3>
+                    <div class="flex gap-2">
+                        <select id="filterRole" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm">
+                            <option value="all">All Roles</option>
+                            <option value="Student">Student</option>
+                            <option value="Teacher">Teacher</option>
+                            <option value="Staff">Staff</option>
+                        </select>
+                        <select id="filterStatus" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm">
+                            <option value="all">All Status</option>
+                            <option value="pending">⏳ Pending</option>
+                            <option value="approved">✅ Approved</option>
+                            <option value="rejected">❌ Rejected</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="text-left text-gray-600 border-b-2 border-gray-100">
-                            <th class="py-3 px-3 font-semibold">#</th>
-                            <th class="py-3 px-3 font-semibold">Pangalan</th>
-                            <th class="py-3 px-3 font-semibold">Tauhan</th>
-                            <th class="py-3 px-3 font-semibold">Petsa</th>
-                            <th class="py-3 px-3 font-semibold">Oras</th>
-                            <th class="py-3 px-3 font-semibold">Uri ng Bisita</th>
-                            <th class="py-3 px-3 font-semibold">Sintomas / Sakit</th>
-                            <th class="py-3 px-3 font-semibold">Katayuan</th>
-                            <th class="py-3 px-3 font-semibold text-center">Gawin</th>
-                        </tr>
-                    </thead>
-                    <tbody id="allAppointmentsTable">
-                        <tr><td colspan="9" class="py-8 text-center text-gray-400 italic">Wala pang kahilingan mula sa sinuman.</td></tr>
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-gray-600 border-b-2 border-gray-100">
+                                <th class="py-3 px-3 font-semibold">#</th>
+                                <th class="py-3 px-3 font-semibold">Name</th>
+                                <th class="py-3 px-3 font-semibold">Role</th>
+                                <th class="py-3 px-3 font-semibold">Date</th>
+                                <th class="py-3 px-3 font-semibold">Time</th>
+                                <th class="py-3 px-3 font-semibold">Visit Type</th>
+                                <th class="py-3 px-3 font-semibold">Concern</th>
+                                <th class="py-3 px-3 font-semibold text-center">Status</th>
+                                <th class="py-3 px-3 font-semibold text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allAppointmentsTable">
+                            <tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment requests yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </main>
 </div>
+
 <script>
+// === PASSWORD TOGGLE ===
+function togglePassword(inputId, eyeId) {
+    const input = document.getElementById(inputId);
+    const eye = document.getElementById(eyeId);
+    if (input.type === "password") {
+        input.type = "text";
+        eye.classList.remove("fa-eye"); eye.classList.add("fa-eye-slash");
+    } else {
+        input.type = "password";
+        eye.classList.remove("fa-eye-slash"); eye.classList.add("fa-eye");
+    }
+}
+
 // === DATA STORAGE ===
 const STORAGE_USERS = 'clinicUsers_v3';
 const STORAGE_APTS = 'clinicAppointments_v3';
 let currentUser = null;
-function getUsers() { return JSON.parse(localStorage.getItem(STORAGE_USERS) || '[]'); }
-function saveUsers(arr) { localStorage.setItem(STORAGE_USERS, JSON.stringify(arr)); }
-function getAppointments() { return JSON.parse(localStorage.getItem(STORAGE_APTS) || '[]'); }
-function saveAppointments(arr) { localStorage.setItem(STORAGE_APTS, JSON.stringify(arr)); }
+let selectedTimeSlot = null;
+
+// ✅ AVAILABLE TIME SLOTS (Fixed schedule)
+const ALL_TIME_SLOTS = [
+    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+    '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
+];
+
+const getUsers = () => JSON.parse(localStorage.getItem(STORAGE_USERS) || '[]');
+const saveUsers = arr => localStorage.setItem(STORAGE_USERS, JSON.stringify(arr));
+const getAppointments = () => JSON.parse(localStorage.getItem(STORAGE_APTS) || '[]');
+const saveAppointments = arr => localStorage.setItem(STORAGE_APTS, JSON.stringify(arr));
+
 // === DEFAULT NURSE ACCOUNT ===
 function ensureNurseExists() {
     let users = getUsers();
     if (!users.find(u => u.role === 'nurse')) {
-        users.push({
-            name: 'Nars ng Paaralan',
-            email: 'nurse@school.ph',
-            password: 'nurse123',
-            role: 'nurse'
-        });
+        users.push({ name: 'School Nurse', email: 'nurse@school.ph', password: 'nurse123', role: 'nurse' });
         saveUsers(users);
     }
 }
-// === SWITCH AUTH TABS ===
+
+// === PREVENT WEEKEND DATES ===
+function setDateRestrictions() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('aptDate').min = today;
+}
+
+// === ✅ LOAD AVAILABLE TIME SLOTS BASED ON SELECTED DATE ===
+function loadAvailableTimeSlots() {
+    const dateInput = document.getElementById('aptDate');
+    const selectedDate = dateInput.value;
+    const container = document.getElementById('timeSlotsContainer');
+    
+    if (!selectedDate) {
+        container.innerHTML = '<span class="text-gray-400 text-sm col-span-3">Select a date first...</span>';
+        return;
+    }
+
+    // Check if Saturday or Sunday
+    const dateObj = new Date(selectedDate + 'T00:00:00');
+    const dayOfWeek = dateObj.getDay(); // 0=Sunday, 6=Saturday
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+        container.innerHTML = '<span class="text-red-500 text-sm col-span-3">⚠️ Appointments are Monday–Friday only.</span>';
+        document.getElementById('aptTime').value = '';
+        selectedTimeSlot = null;
+        return;
+    }
+
+    // Get all taken times for this date
+    const appointments = getAppointments();
+    const takenTimes = appointments
+        .filter(a => a.date === selectedDate)
+        .map(a => a.time);
+
+    // Show available slots
+    container.innerHTML = ALL_TIME_SLOTS.map(time => {
+        const isTaken = takenTimes.includes(time);
+        if (isTaken) {
+            return `<div class="time-slot taken border rounded px-2 py-1 text-center text-sm">${time}</div>`;
+        } else {
+            return `<div class="time-slot border border-blue-300 rounded px-2 py-1 text-center text-sm bg-white" onclick="selectTimeSlot('${time}')">${time}</div>`;
+        }
+    }).join('');
+}
+
+// === ✅ SELECT TIME SLOT ===
+function selectTimeSlot(time) {
+    selectedTimeSlot = time;
+    document.getElementById('aptTime').value = time;
+    
+    // Update visual highlight
+    document.querySelectorAll('.time-slot').forEach(el => {
+        el.classList.remove('selected');
+        if (!el.classList.contains('taken')) {
+            el.classList.remove('border-blue-600');
+        }
+    });
+    event.currentTarget.classList.add('selected');
+}
+
+// === SWITCH LOGIN/REGISTER TABS ===
 function showAuthTab(tab) {
     const tabLogin = document.getElementById('tabLogin');
     const tabReg = document.getElementById('tabRegister');
-    const formLogin = document.getElementById('formLogin');
-    const formReg = document.getElementById('formRegister');
     if (tab === 'login') {
-        tabLogin.classList.add('tab-active'); tabLogin.classList.remove('text-gray-500');
-        tabReg.classList.remove('tab-active'); tabReg.classList.add('text-gray-500');
-        formLogin.classList.remove('hidden'); formReg.classList.add('hidden');
+        tabLogin.classList.add('tab-active'); tabReg.classList.remove('tab-active');
+        tabLogin.classList.remove('text-gray-500'); tabReg.classList.add('text-gray-500');
+        document.getElementById('formLogin').classList.remove('hidden');
+        document.getElementById('formRegister').classList.add('hidden');
     } else {
-        tabReg.classList.add('tab-active'); tabReg.classList.remove('text-gray-500');
-        tabLogin.classList.remove('tab-active'); tabLogin.classList.add('text-gray-500');
-        formReg.classList.remove('hidden'); formLogin.classList.add('hidden');
+        tabReg.classList.add('tab-active'); tabLogin.classList.remove('tab-active');
+        tabReg.classList.remove('text-gray-500'); tabLogin.classList.add('text-gray-500');
+        document.getElementById('formRegister').classList.remove('hidden');
+        document.getElementById('formLogin').classList.add('hidden');
     }
     document.getElementById('authMsg').textContent = '';
 }
-// === REGISTER ===
+
+// === REGISTER USER ===
 function registerUser() {
     const name = document.getElementById('regName').value.trim();
     const email = document.getElementById('regEmail').value.trim().toLowerCase();
@@ -484,91 +589,123 @@ function registerUser() {
     const role = document.getElementById('regRole').value;
     const msg = document.getElementById('authMsg');
     if (!name || !email || !pass) {
-        msg.textContent = '⚠️ Punan ang lahat ng patlang!'; msg.className = 'mt-4 text-center font-medium text-orange-500'; return;
+        msg.textContent = '⚠️ Please fill in all fields!'; msg.className = 'text-orange-500'; return;
     }
     if (pass.length < 6) {
-        msg.textContent = '⚠️ Hindi bababa sa 6 titik ang lihim na salita!'; msg.className = 'mt-4 text-center font-medium text-orange-500'; return;
+        msg.textContent = '⚠️ Password must be at least 6 characters!'; msg.className = 'text-orange-500'; return;
     }
     let users = getUsers();
     if (users.find(u => u.email === email)) {
-        msg.textContent = '❌ Mayroon nang gumagamit ng email na ito!'; msg.className = 'mt-4 text-center font-medium text-red-500'; return;
+        msg.textContent = '❌ Email already registered!'; msg.className = 'text-red-500'; return;
     }
     users.push({ name, email, password: pass, role });
     saveUsers(users);
-    msg.textContent = '✅ Matagumpay! Maaari ka nang Pumasok.'; msg.className = 'mt-4 text-center font-medium text-green-500';
+    msg.textContent = '✅ Account created! Please sign in.'; msg.className = 'text-green-500';
     setTimeout(() => showAuthTab('login'), 1500);
 }
-// === LOGIN ===
+
+// === LOGIN USER ===
 function loginUser() {
     const email = document.getElementById('loginEmail').value.trim().toLowerCase();
     const pass = document.getElementById('loginPass').value;
-    const msg = document.getElementById('authMsg');
     const users = getUsers();
     const user = users.find(u => u.email === email && u.password === pass);
+    const msg = document.getElementById('authMsg');
     if (!user) {
-        msg.textContent = '❌ Hindi Tama ang Email o Lihim na Salita!'; msg.className = 'mt-4 text-center font-medium text-red-500'; return;
+        msg.textContent = '❌ Incorrect email or password!'; msg.className = 'text-red-500'; return;
     }
     currentUser = user;
     openDashboard();
 }
-// === OPEN DASHBOARD BASED ON ROLE ===
+
+// === SWITCH NURSE TABS ===
+function showNurseTab(tab) {
+    document.getElementById('nurseViewDashboard').classList.add('hidden');
+    document.getElementById('nurseViewAppointments').classList.add('hidden');
+    document.getElementById('nurseViewHistory').classList.add('hidden');
+    document.getElementById('navDashboard').classList.remove('active');
+    document.getElementById('navHistory').classList.remove('active');
+    document.getElementById('navAppointments').classList.remove('active');
+
+    if (tab === 'dashboard') {
+        document.getElementById('nurseViewDashboard').classList.remove('hidden');
+        document.getElementById('navDashboard').classList.add('active');
+        updateStats();
+    } else if (tab === 'history') {
+        document.getElementById('nurseViewHistory').classList.remove('hidden');
+        document.getElementById('navHistory').classList.add('active');
+        renderHistory(true);
+    } else if (tab === 'appointments') {
+        document.getElementById('nurseViewAppointments').classList.remove('hidden');
+        document.getElementById('navAppointments').classList.add('active');
+        renderAllAppointments();
+    }
+}
+
+// === OPEN DASHBOARD ===
 function openDashboard() {
     document.getElementById('authSection').classList.add('hidden');
-    const role = currentUser.role;
-    if (role === 'nurse') {
+    if (currentUser.role === 'nurse') {
         document.getElementById('nurseDashboard').classList.remove('hidden');
-        renderAllAppointments();
+        showNurseTab('dashboard');
     } else {
         document.getElementById('userDashboard').classList.remove('hidden');
         document.getElementById('displayName').textContent = currentUser.name;
-        const labels = { Student: '🎓 Mag-aaral', Teacher: '📖 Guro', Staff: '🏛️ Kawani' };
-        document.getElementById('displayRole').textContent = labels[role];
+        const labels = { Student: '🎓 Student', Teacher: '📖 Teacher', Staff: '🏛️ Staff' };
+        document.getElementById('displayRole').textContent = labels[currentUser.role];
         renderMyAppointments();
+        setDateRestrictions();
     }
 }
-// === SUBMIT APPOINTMENT ===
+
+// === ✅ SUBMIT APPOINTMENT WITH TIME SLOT VALIDATION ===
 function submitAppointment() {
     const date = document.getElementById('aptDate').value;
-    const time = document.getElementById('aptTime').value;
+    const time = selectedTimeSlot;
     const type = document.getElementById('aptType').value;
     const reason = document.getElementById('aptReason').value.trim();
-    if (!date || !time || !reason) {
-        alert('⚠️ Punan ang lahat ng patlang!'); return;
+
+    if (!date || !time || !reason) { 
+        alert('⚠️ Please select a date, available time slot, and fill in purpose!'); 
+        return; 
     }
-    let apts = getAppointments();
-    apts.push({
-        id: Date.now(),
-        userId: currentUser.email,
-        userName: currentUser.name,
-        userRole: currentUser.role,
-        date, time, type, reason,
-        status: 'pending'
+
+    // Double-check: prevent duplicate booking
+    const appointments = getAppointments();
+    const duplicate = appointments.find(a => a.date === date && a.time === time);
+    if (duplicate) {
+        alert('❌ Sorry, this time slot was just taken! Please select another.');
+        loadAvailableTimeSlots();
+        return;
+    }
+
+    appointments.push({
+        id: Date.now(), userId: currentUser.email, userName: currentUser.name,
+        userRole: currentUser.role, date, time, type, reason, status: 'pending'
     });
-    saveAppointments(apts);
-    alert('✅ Matagumpay na naipadala sa Nars!');
+    saveAppointments(appointments);
+    alert('✅ Appointment submitted!');
+    
+    // Reset form
     document.getElementById('aptDate').value = '';
     document.getElementById('aptTime').value = '';
     document.getElementById('aptReason').value = '';
+    document.getElementById('timeSlotsContainer').innerHTML = '<span class="text-gray-400 text-sm col-span-3">Select a date first...</span>';
+    selectedTimeSlot = null;
+
     renderMyAppointments();
 }
-// === RENDER USER'S OWN APPOINTMENTS ===
+
+// === RENDER USER'S APPOINTMENTS ===
 function renderMyAppointments() {
     const apts = getAppointments().filter(a => a.userId === currentUser.email).sort((a,b) => b.id - a.id);
     const tbody = document.getElementById('myAppointmentsTable');
     if (apts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">Wala pang naipadalang kahilingan.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">No appointments yet.</td></tr>';
         return;
     }
-    const statusClass = {
-        pending: 'status-pending',
-        approved: 'status-approved',
-        rejected: 'status-rejected'
-    };
-    const statusText = {
-        pending: '⏳ Naghihintay',
-        approved: '✅ Tinanggap',
-        rejected: '❌ Tinanggihan'
-    };
+    const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
+    const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
     tbody.innerHTML = apts.map((a, i) => `
         <tr class="border-b hover:bg-blue-50">
             <td class="py-2 px-2">${i+1}</td>
@@ -576,122 +713,107 @@ function renderMyAppointments() {
             <td class="py-2 px-2">${a.time}</td>
             <td class="py-2 px-2">${a.type}</td>
             <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
-            <td class="py-2 px-2"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${statusClass[a.status]}">${statusText[a.status]}</span></td>
-        </tr>
-    `).join('');
+            <td class="py-2 px-2"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span></td>
+        </tr>`).join('');
 }
-// === UPDATE STATISTICS CARDS ===
+
+// === UPDATE STATISTICS ===
 function updateStats() {
     const apts = getAppointments();
-    const total = apts.length;
-    const pending = apts.filter(a => a.status === 'pending').length;
-    const approved = apts.filter(a => a.status === 'approved').length;
-    const rejected = apts.filter(a => a.status === 'rejected').length;
-    document.getElementById('statNew').textContent = total;
-    document.getElementById('statPending').textContent = pending;
-    document.getElementById('statApproved').textContent = approved;
-    document.getElementById('statRejected').textContent = rejected;
-    document.getElementById('pendingBadge').textContent = pending;
+    document.getElementById('statNew').textContent = apts.length;
+    document.getElementById('statPending').textContent = apts.filter(a => a.status === 'pending').length;
+    document.getElementById('statApproved').textContent = apts.filter(a => a.status === 'approved').length;
+    document.getElementById('statRejected').textContent = apts.filter(a => a.status === 'rejected').length;
+    document.getElementById('pendingBadge').textContent = apts.filter(a => a.status === 'pending').length;
 }
-// === ✨ SEARCH PATIENT HISTORY ===
+
+// === SEARCH PATIENT HISTORY ===
 function searchPatientHistory() {
-    const searchName = document.getElementById('searchPatientName').value.trim().toLowerCase();
+    const name = document.getElementById('searchPatientName').value.trim().toLowerCase();
     const resultDiv = document.getElementById('patientHistoryResult');
     const tableBody = document.getElementById('patientHistoryTable');
-    
-    if (!searchName) {
-        alert('⚠️ I-type muna ang pangalan ng pasyente!');
-        return;
-    }
-
-    const allApts = getAppointments();
-    // Hanapin LAHAT ng appointment na tumutugma sa pangalan — KASAMA NA ANG MGA TINAPOS/TINANGGIHAN
-    const patientHistory = allApts.filter(a => 
-        a.userName && a.userName.toLowerCase().includes(searchName)
-    ).sort((a, b) => b.id - a.id); // Pinakabago sa una
-
+    if (!name) { alert('⚠️ Enter patient name!'); return; }
+    const history = getAppointments().filter(a => a.userName?.toLowerCase().includes(name)).sort((a,b) => b.id - a.id);
     resultDiv.classList.remove('hidden');
-
-    if (patientHistory.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">❌ Walang nakitang kasaysayan para sa pangalang ito.</td></tr>';
+    if (history.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">❌ No history found.</td></tr>';
         return;
     }
-
-    const statusClass = {
-        pending: 'status-pending',
-        approved: 'status-approved',
-        rejected: 'status-rejected'
-    };
-    const statusText = {
-        pending: '⏳ Naghihintay',
-        approved: '✅ Tinanggap',
-        rejected: '❌ Tinanggihan'
-    };
-
-    tableBody.innerHTML = patientHistory.map((a, i) => `
+    const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
+    const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
+    tableBody.innerHTML = history.map((a, i) => `
         <tr class="border-b hover:bg-blue-50">
             <td class="py-2 px-3">${i+1}</td>
             <td class="py-2 px-3">${a.date}</td>
             <td class="py-2 px-3">${a.time}</td>
             <td class="py-2 px-3">${a.type}</td>
             <td class="py-2 px-3 max-w-xs truncate">${a.reason}</td>
-            <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${statusClass[a.status]}">${statusText[a.status]}</span></td>
-        </tr>
-    `).join('');
+            <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span></td>
+        </tr>`).join('');
 }
-// === RENDER ALL APPOINTMENTS — NURSE ONLY ===
-function renderAllAppointments() {
+
+// === RENDER HISTORY ===
+function renderHistory(oldestFirst = true) {
     let apts = getAppointments();
-    
-    // Apply filters
-    const roleFilter = document.getElementById('filterRole').value;
-    const statusFilter = document.getElementById('filterStatus').value;
-    
-    if (roleFilter !== 'all') apts = apts.filter(a => a.userRole === roleFilter);
-    if (statusFilter !== 'all') apts = apts.filter(a => a.status === statusFilter);
-    
-    apts.sort((a,b) => b.id - a.id);
-    
-    const tbody = document.getElementById('allAppointmentsTable');
-    // Update statistics cards
-    updateStats();
+    apts.sort((a, b) => oldestFirst ? a.id - b.id : b.id - a.id);
+    const tbody = document.getElementById('historyTable');
     if (apts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400 italic">Wala pang kahilingan.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td></tr>';
         return;
     }
-    const roleIcon = { Student: '🎓 Mag-aaral', Teacher: '📖 Guro', Staff: '🏛️ Kawani' };
-    const statusClass = {
-        pending: 'status-pending',
-        approved: 'status-approved',
-        rejected: 'status-rejected'
-    };
-    const statusText = {
-        pending: 'Naghihintay',
-        approved: 'Tinanggap',
-        rejected: 'Tinanggihan'
-    };
+    const roleText = { Student: '🎓 Student', Teacher: '📖 Teacher', Staff: '🏛️ Staff' };
+    const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
+    const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
+    tbody.innerHTML = apts.map((a, i) => `
+        <tr class="border-b border-gray-100 hover:bg-blue-50">
+            <td class="py-3 px-3 font-medium text-center">${i+1}</td>
+            <td class="py-3 px-3 font-semibold text-blue-800">${a.userName}</td>
+            <td class="py-3 px-3 text-sm">${roleText[a.userRole] || a.userRole}</td>
+            <td class="py-3 px-3">${a.date}</td>
+            <td class="py-3 px-3">${a.time}</td>
+            <td class="py-3 px-3 text-sm">${a.type}</td>
+            <td class="py-3 px-3 text-sm max-w-xs truncate">${a.reason}</td>
+            <td class="py-3 px-3 text-center"><span class="px-2 py-1 rounded text-xs font-semibold ${cls[a.status]}">${txt[a.status]}</span></td>
+        </tr>`).join('');
+}
+
+// === RENDER ALL APPOINTMENTS ===
+function renderAllAppointments() {
+    let apts = getAppointments();
+    const roleFilter = document.getElementById('filterRole').value;
+    const statusFilter = document.getElementById('filterStatus').value;
+    if (roleFilter !== 'all') apts = apts.filter(a => a.userRole === roleFilter);
+    if (statusFilter !== 'all') apts = apts.filter(a => a.status === statusFilter);
+    apts.sort((a,b) => b.id - a.id);
+    updateStats();
+    const tbody = document.getElementById('allAppointmentsTable');
+    if (apts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment requests found.</td></tr>';
+        return;
+    }
+    const roleText = { Student: '🎓 Student', Teacher: '📖 Teacher', Staff: '🏛️ Staff' };
+    const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
+    const txt = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
     tbody.innerHTML = apts.map((a, i) => `
         <tr class="border-b border-gray-100">
             <td class="py-3 px-3 font-medium">${i+1}</td>
             <td class="py-3 px-3 font-semibold text-blue-800">${a.userName}</td>
-            <td class="py-3 px-3 text-sm">${roleIcon[a.userRole] || a.userRole}</td>
+            <td class="py-3 px-3 text-sm">${roleText[a.userRole] || a.userRole}</td>
             <td class="py-3 px-3">${a.date}</td>
             <td class="py-3 px-3">${a.time}</td>
             <td class="py-3 px-3 text-sm">${a.type}</td>
             <td class="py-3 px-3 text-sm max-w-xs">${a.reason}</td>
-            <td class="py-3 px-3">
-                <span class="px-2 py-1 rounded text-xs font-semibold ${statusClass[a.status]}">${statusText[a.status]}</span>
-            </td>
+            <td class="py-3 px-3 text-center"><span class="px-2 py-1 rounded text-xs font-semibold ${cls[a.status]}">${txt[a.status]}</span></td>
             <td class="py-3 px-3 text-center">
                 ${a.status === 'pending' ? `
-                    <button onclick="updateStatus(${a.id}, 'approved')" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold mr-1 transition-all" title="Tanggapin">✅ Tanggapin</button>
-                    <button onclick="updateStatus(${a.id}, 'rejected')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-semibold transition-all" title="Tanggihan">❌ Tanggihan</button>
+                    <button onclick="updateStatus(${a.id}, 'approved')" class="bg-green-500 text-white px-2 py-1 rounded text-xs mr-1">✅ Approve</button>
+                    <button onclick="updateStatus(${a.id}, 'rejected')" class="bg-red-500 text-white px-2 py-1 rounded text-xs">❌ Reject</button>
                 ` : '<span class="text-gray-400 text-xs">—</span>'}
             </td>
-        </tr>
-    `).join('');
+        </tr>`).join('');
 }
-// === UPDATE APPOINTMENT STATUS ===
+
+// === UPDATE STATUS ===
 function updateStatus(id, status) {
     let apts = getAppointments();
     let idx = apts.findIndex(a => a.id === id);
@@ -699,11 +821,14 @@ function updateStatus(id, status) {
         apts[idx].status = status;
         saveAppointments(apts);
         renderAllAppointments();
+        updateStats();
     }
 }
+
 // === LOGOUT ===
 function logoutSystem() {
     currentUser = null;
+    selectedTimeSlot = null;
     document.getElementById('userDashboard').classList.add('hidden');
     document.getElementById('nurseDashboard').classList.add('hidden');
     document.getElementById('authSection').classList.remove('hidden');
@@ -712,7 +837,8 @@ function logoutSystem() {
     document.getElementById('authMsg').textContent = '';
     showAuthTab('login');
 }
-// === INIT ===
+
+// === INITIALIZE ===
 ensureNurseExists();
 </script>
 </body>

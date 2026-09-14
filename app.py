@@ -7,20 +7,19 @@ import sqlite3
 from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-BASE_DIR = Path(_file_).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent
 DATABASE = BASE_DIR / "clinic.db"
 TIME_SLOTS = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
 ]
 
-app = Flask(_name_)
+app = Flask(__name__, static_folder=str(BASE_DIR), static_url_path="")
 app.config["SECRET_KEY"] = os.environ.get(
     "CLINIC_SECRET_KEY", "change-this-secret-key-in-production"
 )
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = os.environ.get("RENDER", "") == "true"
 
 
 def get_db():
@@ -90,6 +89,7 @@ def login_required(view):
             return jsonify(error="Please sign in first."), 401
         g.user = user
         return view(*args, **kwargs)
+
     return wrapped
 
 
@@ -100,6 +100,7 @@ def nurse_required(view):
         if g.user["role"] != "nurse":
             return jsonify(error="Nurse access required."), 403
         return view(*args, **kwargs)
+
     return wrapped
 
 
@@ -123,7 +124,7 @@ def appointment_dict(row):
 
 @app.get("/")
 def index():
-    return send_from_directory("static", "clinic.html")
+    return send_from_directory(BASE_DIR, "clinic.html")
 
 
 @app.post("/api/register")
@@ -256,6 +257,10 @@ def health():
 
 init_db()
 
-if _name_ == "_main_":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+if __name__ == "__main__":
+    app.run(
+        host=os.environ.get("CLINIC_HOST", "0.0.0.0"),
+        port=int(os.environ.get("CLINIC_PORT", "5050")),
+        debug=os.environ.get("FLASK_DEBUG", "0") == "1",
+        threaded=True,
+    )

@@ -123,7 +123,7 @@ def appointment_dict(row):
 
 @app.get("/")
 def index():
-    return send_from_directory(BASE_DIR, "clinic.html")
+    return send_from_directory(static, "clinic.html")
 
 
 @app.post("/api/register")

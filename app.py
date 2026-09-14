@@ -7,14 +7,14 @@ import sqlite3
 from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(_file_).resolve().parent
 DATABASE = BASE_DIR / "clinic.db"
 TIME_SLOTS = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
 ]
 
-app = Flask(__name__)
+app = Flask(_name_)
 app.config["SECRET_KEY"] = os.environ.get(
     "CLINIC_SECRET_KEY", "change-this-secret-key-in-production"
 )
@@ -123,7 +123,7 @@ def appointment_dict(row):
 
 @app.get("/")
 def index():
-    return send_from_directory(static, "clinic.html")
+    return send_from_directory("static", "clinic.html")
 
 
 @app.post("/api/register")
@@ -256,6 +256,6 @@ def health():
 
 init_db()
 
-if __name__ == "__main__":
+if _name_ == "_main_":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

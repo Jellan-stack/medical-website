@@ -20,6 +20,7 @@ app.config["SECRET_KEY"] = os.environ.get(
 )
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("RENDER", "") == "true"
 
 
 def get_db():
@@ -89,7 +90,6 @@ def login_required(view):
             return jsonify(error="Please sign in first."), 401
         g.user = user
         return view(*args, **kwargs)
-
     return wrapped
 
 
@@ -100,7 +100,6 @@ def nurse_required(view):
         if g.user["role"] != "nurse":
             return jsonify(error="Nurse access required."), 403
         return view(*args, **kwargs)
-
     return wrapped
 
 
@@ -258,9 +257,5 @@ def health():
 init_db()
 
 if __name__ == "__main__":
-    app.run(
-        host=os.environ.get("CLINIC_HOST", "0.0.0.0"),
-        port=int(os.environ.get("CLINIC_PORT", "5050")),
-        debug=os.environ.get("FLASK_DEBUG", "0") == "1",
-        threaded=True,
-    )
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)

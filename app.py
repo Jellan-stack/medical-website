@@ -14,7 +14,7 @@ TIME_SLOTS = [
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
 ]
 
-app = Flask(__name__, static_folder=str(BASE_DIR), static_url_path="")
+app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get(
     "CLINIC_SECRET_KEY", "change-this-secret-key-in-production"
 )
@@ -124,7 +124,7 @@ def appointment_dict(row):
 
 @app.get("/")
 def index():
-    return send_from_directory(BASE_DIR, "clinic.html")
+    return send_from_directory(static, "clinic.html")
 
 
 @app.post("/api/register")

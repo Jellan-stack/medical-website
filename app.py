@@ -314,8 +314,15 @@ def index():
 </div>
 
 <!-- 🏠 USER DASHBOARD -->
-<div id="userDashboard" class="hidden min-h-screen flex">
-    <aside class="w-64 bg-blue-900 text-white hidden md:block">
+<div id="userDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
+        <span class="font-bold">Clinic</span>
+        <button id="userMenuBtn" class="text-xl">☰</button>
+    </div>
+
+    <!-- Sidebar -->
+    <aside id="userSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
         <div class="p-4">
             <div class="flex items-center gap-3 mb-8 mt-2">
                 <i class="fa-solid fa-heart-pulse text-2xl text-red-400"></i>
@@ -334,6 +341,9 @@ def index():
             </nav>
         </div>
     </aside>
+    <!-- Overlay -->
+    <div id="userOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleUserSidebar()"></div>
+
     <main class="flex-1 p-4 md:p-6 bg-gray-50">
         <div class="dashboard-card p-4 mb-6 flex justify-between items-center fade-in">
             <div>
@@ -403,8 +413,18 @@ def index():
 </div>
 
 <!-- 👩‍⚕️ NURSE DASHBOARD -->
-<div id="nurseDashboard" class="hidden min-h-screen flex">
-    <aside class="w-64 bg-blue-900 text-white hidden md:block">
+<div id="nurseDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
+        <div>
+            <span class="font-bold">NURSE PANEL</span>
+            <p class="text-xs text-blue-200">Clinic Management</p>
+        </div>
+        <button id="nurseMenuBtn" class="text-xl">☰</button>
+    </div>
+
+    <!-- Sidebar -->
+    <aside id="nurseSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
         <div class="p-4">
             <div class="flex items-center gap-3 mb-8 mt-2">
                 <i class="fa-solid fa-user-nurse text-2xl text-yellow-400"></i>
@@ -429,6 +449,9 @@ def index():
             </nav>
         </div>
     </aside>
+    <!-- Overlay -->
+    <div id="nurseOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleNurseSidebar()"></div>
+
     <main class="flex-1 p-4 md:p-6 bg-gray-50">
         <!-- DASHBOARD VIEW -->
         <div id="nurseViewDashboard" class="fade-in">
@@ -507,7 +530,6 @@ def index():
                 </div>
             </div>
         </div>
-
         <!-- APPOINTMENT HISTORY VIEW -->
         <div id="nurseViewHistory" class="hidden fade-in">
             <div class="dashboard-card p-6">
@@ -546,7 +568,6 @@ def index():
                 </div>
             </div>
         </div>
-
         <!-- ALL APPOINTMENTS VIEW -->
         <div id="nurseViewAppointments" class="hidden fade-in">
             <div class="dashboard-card p-6">
@@ -592,6 +613,32 @@ def index():
     </main>
 </div>
 
+<!-- ⚡ JAVASCRIPT: Sidebar Toggle -->
+<script>
+// ===== USER SIDEBAR =====
+function toggleUserSidebar() {
+  const sidebar = document.getElementById('userSidebar');
+  const overlay = document.getElementById('userOverlay');
+  sidebar.classList.toggle('-translate-x-full');
+  overlay.classList.toggle('hidden');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('userMenuBtn');
+  if (btn) btn.onclick = toggleUserSidebar;
+});
+
+// ===== NURSE SIDEBAR =====
+function toggleNurseSidebar() {
+  const sidebar = document.getElementById('nurseSidebar');
+  const overlay = document.getElementById('nurseOverlay');
+  sidebar.classList.toggle('-translate-x-full');
+  overlay.classList.toggle('hidden');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('nurseMenuBtn');
+  if (btn) btn.onclick = toggleNurseSidebar;
+});
+</script>
 <script>
 // === PASSWORD TOGGLE ===
 function togglePassword(inputId, eyeId) {

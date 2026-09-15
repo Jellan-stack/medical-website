@@ -8,7 +8,10 @@ from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE = BASE_DIR / "clinic.db"
+DATABASE = Path(
+    os.environ.get("CLINIC_DATABASE_PATH", str(BASE_DIR / "clinic.db"))
+).expanduser()
+DATABASE.parent.mkdir(parents=True, exist_ok=True)
 TIME_SLOTS = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
@@ -24,8 +27,9 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DATABASE)
+        g.db = sqlite3.connect(DATABASE, timeout=30)
         g.db.row_factory = sqlite3.Row
+        g.db.execute("PRAGMA foreign_keys = ON")
     return g.db
 
 
@@ -37,7 +41,9 @@ def close_db(_error):
 
 
 def init_db():
-    db = sqlite3.connect(DATABASE)
+    db = sqlite3.connect(DATABASE, timeout=30)
+    db.execute("PRAGMA foreign_keys = ON")
+    db.execute("PRAGMA journal_mode = WAL")
     db.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -1193,7 +1199,7 @@ init_db()
 if __name__ == "__main__":
     app.run(
         host=os.environ.get("CLINIC_HOST", "0.0.0.0"),
-        port=int(os.environ.get("CLINIC_PORT", "5050")),
+        port=int(os.environ.get("PORT", os.environ.get("CLINIC_PORT", "5050"))),
         debug=os.environ.get("FLASK_DEBUG", "0") == "1",
         threaded=False,
     )

@@ -3,21 +3,12 @@ from functools import wraps
 import os
 from pathlib import Path
 import sqlite3
+
 from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-# --- PAGBABAGO: Siguraduhin ang tamang path ng database ---
 BASE_DIR = Path(__file__).resolve().parent
-
-# ✅ Kung may persistent storage ang platform, gamitin iyon
-# Halimbawa: /data sa Render, /persistent sa iba
-if os.environ.get("PERSISTENT_STORAGE"):
-    DATA_DIR = Path(os.environ["PERSISTENT_STORAGE"])
-    DATA_DIR.mkdir(exist_ok=True)
-    DATABASE = DATA_DIR / "clinic.db"
-else:
-    DATABASE = BASE_DIR / "clinic.db"  # Lokal na paggamit
-
+DATABASE = BASE_DIR / "clinic.db"
 TIME_SLOTS = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
@@ -30,15 +21,13 @@ app.config["SECRET_KEY"] = os.environ.get(
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
-# ✅ Baguhin: Siguraduhin na hindi mawawala ang session
-app.config["SESSION_PERMANENT"] = True
-app.config["PERMANENT_SESSION_LIFETIME"] = 86400 * 7  # 7 araw
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DATABASE, detect_types=sqlite3.PARSE_DECLTYPES)
+        g.db = sqlite3.connect(DATABASE)
         g.db.row_factory = sqlite3.Row
     return g.db
+
 
 @app.teardown_appcontext
 def close_db(_error):
@@ -46,14 +35,11 @@ def close_db(_error):
     if db is not None:
         db.close()
 
-# ✅ PINAKA MAHALAGA: HINDI BURAHIN O PALITAN ANG DATA
-def init_db():
-    """Gumagawa lang ng tables kung wala pa — HINDI babaguhin o buburahin ang laman"""
-    db = sqlite3.connect(DATABASE)
-    cursor = db.cursor()
 
-    # Gumawa ng tables kung wala pa — IF NOT EXISTS kaya ligtas
-    cursor.executescript("""
+def init_db():
+    db = sqlite3.connect(DATABASE)
+    db.executescript(
+        """
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -74,22 +60,16 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id),
             UNIQUE(date, time)
         );
-    """)
-
-    # ✅ I-CHECK MUNA KUNG MAY NURSE NA — KUNG WALA PA LAGYAN
-    nurse = cursor.execute("SELECT id FROM users WHERE email = ?", ("nurse@school.ph",)).fetchone()
+        """
+    )
+    nurse = db.execute("SELECT id FROM users WHERE email = ?", ("nurse@school.ph",)).fetchone()
     if nurse is None:
-        cursor.execute(
+        db.execute(
             "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)",
             ("School Nurse", "nurse@school.ph", generate_password_hash("nurse123"), "nurse"),
         )
-        db.commit()
-        print("✅ Default nurse account created")
-    else:
-        print("ℹ️ Nurse account already exists — skipped, data preserved")
-
+    db.commit()
     db.close()
-    print(f"✅ Database ready at: {DATABASE}")
 
 
 def current_user():
@@ -100,6 +80,7 @@ def current_user():
         "SELECT id, name, email, role FROM users WHERE id = ?", (user_id,)
     ).fetchone()
 
+
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -108,7 +89,9 @@ def login_required(view):
             return jsonify(error="Please sign in first."), 401
         g.user = user
         return view(*args, **kwargs)
+
     return wrapped
+
 
 def nurse_required(view):
     @wraps(view)
@@ -117,10 +100,13 @@ def nurse_required(view):
         if g.user["role"] != "nurse":
             return jsonify(error="Nurse access required."), 403
         return view(*args, **kwargs)
+
     return wrapped
+
 
 def user_dict(user):
     return {"name": user["name"], "email": user["email"], "role": user["role"]}
+
 
 def appointment_dict(row):
     return {
@@ -135,16 +121,9 @@ def appointment_dict(row):
         "status": row["status"],
     }
 
-# ✅ I-call ang init_db() kapag nagsimula ang app — LIGTAS NA, HINDI MABUBURA ANG DATA
-with app.app_context():
-    init_db()
 
 @app.get("/")
 def index():
-    return send_from_directory(str(BASE_DIR), "index.html")
-
-
-# --- Ipagpatuloy mo lang ang ibang routes na mayroon ka ---
     HTML_CONTENT = """
     
 <!DOCTYPE html>

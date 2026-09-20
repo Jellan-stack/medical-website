@@ -20,12 +20,13 @@ def get_db():
             return None
     return g.db
 
+@app.teardown_appcontext
+def close_db(_error):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE = Path(
-    os.environ.get("CLINIC_DATABASE_PATH", str(BASE_DIR / "clinic.db"))
-).expanduser()
-DATABASE.parent.mkdir(parents=True, exist_ok=True)
 TIME_SLOTS = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
@@ -38,68 +39,67 @@ app.config["SECRET_KEY"] = os.environ.get(
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
-
-def get_db():
-    if "db" not in g:
-        g.db = sqlite3.connect(DATABASE, timeout=30)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys = ON")
-    return g.db
-
-
-@app.teardown_appcontext
-def close_db(_error):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
-
-
+# === DATABASE INITIALIZATION — POSTGRESQL SYNTAX ===
 def init_db():
-    db = sqlite3.connect(DATABASE, timeout=30)
-    db.execute("PRAGMA foreign_keys = ON")
-    db.execute("PRAGMA journal_mode = WAL")
-    db.executescript(
-        """
+    conn = get_db()
+    if not conn:
+        print("❌ Hindi makakonekta sa database!")
+        return
+    cur = conn.cursor()
+    
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('Student', 'Teacher', 'Staff', 'nurse'))
         );
+    """)
+    
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS appointments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
             date TEXT NOT NULL,
             time TEXT NOT NULL,
             type TEXT NOT NULL,
             reason TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'pending'
                 CHECK(status IN ('pending', 'approved', 'rejected')),
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(date, time)
         );
-        """
-    )
-    nurse = db.execute("SELECT id FROM users WHERE email = ?", ("nurse@school.ph",)).fetchone()
+    """)
+    
+    cur.execute("SELECT id FROM users WHERE email = %s", ("nurse@school.ph",))
+    nurse = cur.fetchone()
     if nurse is None:
-        db.execute(
-            "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)",
+        cur.execute(
+            "INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)",
             ("School Nurse", "nurse@school.ph", generate_password_hash("nurse123"), "nurse"),
         )
-    db.commit()
-    db.close()
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    print("✅ Database ready!")
 
-
+# === AUTH HELPERS ===
 def current_user():
     user_id = session.get("user_id")
     if not user_id:
         return None
-    return get_db().execute(
-        "SELECT id, name, email, role FROM users WHERE id = ?", (user_id,)
-    ).fetchone()
-
+    conn = get_db()
+    if not conn:
+        return None
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, email, role FROM users WHERE id = %s", (user_id,))
+    user = cur.fetchone()
+    cur.close()
+    if not user:
+        return None
+    return {"id": user[0], "name": user[1], "email": user[2], "role": user[3]}
 
 def login_required(view):
     @wraps(view)
@@ -109,9 +109,7 @@ def login_required(view):
             return jsonify(error="Please sign in first."), 401
         g.user = user
         return view(*args, **kwargs)
-
     return wrapped
-
 
 def nurse_required(view):
     @wraps(view)
@@ -120,32 +118,28 @@ def nurse_required(view):
         if g.user["role"] != "nurse":
             return jsonify(error="Nurse access required."), 403
         return view(*args, **kwargs)
-
     return wrapped
 
-
 def user_dict(user):
-    return {"name": user["name"], "email": user["email"], "role": user["role"]}
-
+    return {"id": user["id"], "name": user["name"], "email": user["email"], "role": user["role"]}
 
 def appointment_dict(row):
     return {
-        "id": row["id"],
-        "userId": row["email"],
-        "userName": row["name"],
-        "userRole": row["role"],
-        "date": row["date"],
-        "time": row["time"],
-        "type": row["type"],
-        "reason": row["reason"],
-        "status": row["status"],
+        "id": row[0],
+        "userId": row[2],
+        "userName": row[1],
+        "userRole": row[3],
+        "date": row[4],
+        "time": row[5],
+        "type": row[6],
+        "reason": row[7],
+        "status": row[8],
     }
 
-
+# === HTML CONTENT (HINDI BINAGO) ===
 @app.get("/")
 def index():
     HTML_CONTENT = """
-    
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -262,7 +256,6 @@ def index():
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-
 <!-- 🔐 LOGIN PAGE -->
 <div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4">
     <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
@@ -332,7 +325,6 @@ def index():
         <p id="authMsg" class="mt-4 text-center font-medium"></p>
     </div>
 </div>
-
 <!-- 🏠 USER DASHBOARD -->
 <div id="userDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
     <!-- Mobile Menu Button -->
@@ -340,7 +332,6 @@ def index():
         <span class="font-bold">Clinic</span>
         <button id="userMenuBtn" class="text-xl">☰</button>
     </div>
-
     <!-- Sidebar -->
     <aside id="userSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
         <div class="p-4">
@@ -363,7 +354,6 @@ def index():
     </aside>
     <!-- Overlay -->
     <div id="userOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleUserSidebar()"></div>
-
     <main class="flex-1 p-4 md:p-6 bg-gray-50">
         <div class="dashboard-card p-4 mb-6 flex justify-between items-center fade-in">
             <div>
@@ -431,7 +421,6 @@ def index():
         </div>
     </main>
 </div>
-
 <!-- 👩‍⚕️ NURSE DASHBOARD -->
 <div id="nurseDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
     <!-- Mobile Menu Button -->
@@ -442,7 +431,6 @@ def index():
         </div>
         <button id="nurseMenuBtn" class="text-xl">☰</button>
     </div>
-
     <!-- Sidebar -->
     <aside id="nurseSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
         <div class="p-4">
@@ -471,7 +459,6 @@ def index():
     </aside>
     <!-- Overlay -->
     <div id="nurseOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleNurseSidebar()"></div>
-
     <main class="flex-1 p-4 md:p-6 bg-gray-50">
         <!-- DASHBOARD VIEW -->
         <div id="nurseViewDashboard" class="fade-in">
@@ -632,7 +619,6 @@ def index():
         </div>
     </main>
 </div>
-
 <!-- ⚡ JAVASCRIPT: Sidebar Toggle -->
 <script>
 // ===== USER SIDEBAR =====
@@ -646,7 +632,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('userMenuBtn');
   if (btn) btn.onclick = toggleUserSidebar;
 });
-
 // ===== NURSE SIDEBAR =====
 function toggleNurseSidebar() {
   const sidebar = document.getElementById('nurseSidebar');
@@ -672,17 +657,14 @@ function togglePassword(inputId, eyeId) {
         eye.classList.remove("fa-eye-slash"); eye.classList.add("fa-eye");
     }
 }
-
 let currentUser = null;
 let selectedTimeSlot = null;
 let isSubmittingAppointment = false;
-
 // ✅ AVAILABLE TIME SLOTS (Fixed schedule)
 const ALL_TIME_SLOTS = [
     '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
     '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
 ];
-
 async function api(url, options = {}) {
     const response = await fetch(url, {
         headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
@@ -692,20 +674,16 @@ async function api(url, options = {}) {
     if (!response.ok) throw new Error(data.error || 'Something went wrong.');
     return data;
 }
-
 // === PREVENT WEEKEND DATES ===
 function setDateRestrictions() {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('aptDate').min = today;
 }
-
 // === ✅ LOAD AVAILABLE TIME SLOTS BASED ON SELECTED DATE ===
 async function loadAvailableTimeSlots() {
     const dateInput = document.getElementById('aptDate');
     const selectedDate = dateInput.value;
     const container = document.getElementById('timeSlotsContainer');
-
-    // A time slot belongs to the selected date, so never carry it to another date.
     selectedTimeSlot = null;
     document.getElementById('aptTime').value = '';
     
@@ -713,17 +691,14 @@ async function loadAvailableTimeSlots() {
         container.innerHTML = '<span class="text-gray-400 text-sm col-span-3">Select a date first...</span>';
         return;
     }
-
-    // Check if Saturday or Sunday
     const dateObj = new Date(selectedDate + 'T00:00:00');
-    const dayOfWeek = dateObj.getDay(); // 0=Sunday, 6=Saturday
+    const dayOfWeek = dateObj.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
         container.innerHTML = '<span class="text-red-500 text-sm col-span-3">⚠️ Appointments are Monday–Friday only.</span>';
         document.getElementById('aptTime').value = '';
         selectedTimeSlot = null;
         return;
     }
-
     let takenTimes;
     try {
         const data = await api(`/api/appointments/slots?date=${encodeURIComponent(selectedDate)}`);
@@ -732,8 +707,6 @@ async function loadAvailableTimeSlots() {
         container.innerHTML = `<span class="text-red-500 text-sm col-span-3">${error.message}</span>`;
         return;
     }
-
-    // Show available slots
     container.innerHTML = ALL_TIME_SLOTS.map(time => {
         const isTaken = takenTimes.includes(time);
         if (isTaken) {
@@ -743,13 +716,11 @@ async function loadAvailableTimeSlots() {
         }
     }).join('');
 }
-
 // === ✅ SELECT TIME SLOT ===
 function selectTimeSlot(time, clickEvent) {
     selectedTimeSlot = time;
     document.getElementById('aptTime').value = time;
     
-    // Update visual highlight
     document.querySelectorAll('.time-slot').forEach(el => {
         el.classList.remove('selected');
         if (!el.classList.contains('taken')) {
@@ -758,7 +729,6 @@ function selectTimeSlot(time, clickEvent) {
     });
     clickEvent.currentTarget.classList.add('selected');
 }
-
 // === SWITCH LOGIN/REGISTER TABS ===
 function showAuthTab(tab) {
     const tabLogin = document.getElementById('tabLogin');
@@ -776,7 +746,6 @@ function showAuthTab(tab) {
     }
     document.getElementById('authMsg').textContent = '';
 }
-
 // === REGISTER USER ===
 async function registerUser() {
     const name = document.getElementById('regName').value.trim();
@@ -798,20 +767,17 @@ async function registerUser() {
         msg.textContent = `❌ ${error.message}`; msg.className = 'text-red-500';
     }
 }
-
 // === LOGIN USER ===
 async function loginUser() {
     const email = document.getElementById('loginEmail').value.trim().toLowerCase();
     const pass = document.getElementById('loginPass').value;
     const msg = document.getElementById('authMsg');
     const loginButton = document.getElementById('loginButton');
-
     if (!email || !pass) {
         msg.textContent = '⚠️ Enter your email and password.';
         msg.className = 'text-orange-500';
         return;
     }
-
     loginButton.disabled = true;
     loginButton.classList.add('opacity-60', 'cursor-not-allowed');
     try {
@@ -829,7 +795,6 @@ async function loginUser() {
         loginButton.classList.remove('opacity-60', 'cursor-not-allowed');
     }
 }
-
 // === SWITCH NURSE TABS ===
 function showNurseTab(tab) {
     document.getElementById('nurseViewDashboard').classList.add('hidden');
@@ -838,7 +803,6 @@ function showNurseTab(tab) {
     document.getElementById('navDashboard').classList.remove('active');
     document.getElementById('navHistory').classList.remove('active');
     document.getElementById('navAppointments').classList.remove('active');
-
     if (tab === 'dashboard') {
         document.getElementById('nurseViewDashboard').classList.remove('hidden');
         document.getElementById('navDashboard').classList.add('active');
@@ -853,7 +817,6 @@ function showNurseTab(tab) {
         renderAllAppointments();
     }
 }
-
 // === OPEN DASHBOARD ===
 function openDashboard() {
     document.getElementById('authSection').classList.add('hidden');
@@ -869,26 +832,21 @@ function openDashboard() {
         setDateRestrictions();
     }
 }
-
 // === ✅ SUBMIT APPOINTMENT WITH TIME SLOT VALIDATION ===
 async function submitAppointment() {
     if (isSubmittingAppointment) return;
-
     const date = document.getElementById('aptDate').value;
     const time = selectedTimeSlot;
     const type = document.getElementById('aptType').value;
     const reason = document.getElementById('aptReason').value.trim();
-
     if (!date || !time || !reason) { 
         alert('⚠️ Please select a date, available time slot, and fill in purpose!'); 
         return; 
     }
-
     const submitButton = document.getElementById('submitAppointmentButton');
     isSubmittingAppointment = true;
     submitButton.disabled = true;
     submitButton.classList.add('opacity-60', 'cursor-not-allowed');
-
     try {
         await api('/api/appointments', {
             method: 'POST', body: JSON.stringify({ date, time, type, reason })
@@ -904,16 +862,13 @@ async function submitAppointment() {
         submitButton.classList.remove('opacity-60', 'cursor-not-allowed');
     }
     
-    // Reset form
     document.getElementById('aptDate').value = '';
     document.getElementById('aptTime').value = '';
     document.getElementById('aptReason').value = '';
     document.getElementById('timeSlotsContainer').innerHTML = '<span class="text-gray-400 text-sm col-span-3">Select a date first...</span>';
     selectedTimeSlot = null;
-
     renderMyAppointments();
 }
-
 // === RENDER USER'S APPOINTMENTS ===
 async function renderMyAppointments() {
     let apts;
@@ -939,16 +894,143 @@ async function renderMyAppointments() {
             <td class="py-2 px-2"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span></td>
         </tr>`).join('');
 }
-
-// === UPDATE STATISTICS ===
+# === UPDATE STATISTICS ===
 async function updateStats() {
-    let apts;
-    try { apts = (await api('/api/appointments')).appointments; } catch (error) { return; }
-    document.getElementById('statNew').textContent = apts.length;
-    document.getElementById('statPending').textContent = apts.filter(a => a.status === 'pending').length;
-    document.getElementById('statApproved').textContent = apts.filter(a => a.status === 'approved').length;
-    document.getElementById('statRejected').textContent = apts.filter(a => a.status === 'rejected').length;
-    document.getElementById('pendingBadge').textContent = apts.filter(a => a.status === 'pending').length;
+    try {
+        const data = await api('/api/stats');
+        document.getElementById('statNew').textContent = data.newRequests;
+        document.getElementById('statPending').textContent = data.pending;
+        document.getElementById('statApproved').textContent = data.approved;
+        document.getElementById('statRejected').textContent = data.rejected;
+        document.getElementById('pendingBadge').textContent = data.pending;
+    } catch (error) {
+        console.error('Failed to load stats:', error);
+    }
+}
+
+// === RENDER ALL APPOINTMENTS (NURSE PANEL) ===
+async function renderAllAppointments() {
+    const filterRole = document.getElementById('filterRole').value;
+    const filterStatus = document.getElementById('filterStatus').value;
+
+    try {
+        const data = await api('/api/appointments/all');
+        let apts = data.appointments;
+
+        // Apply role filter
+        if (filterRole !== 'all') {
+            apts = apts.filter(a => a.userRole === filterRole);
+        }
+        // Apply status filter
+        if (filterStatus !== 'all') {
+            apts = apts.filter(a => a.status === filterStatus);
+        }
+
+        const tbody = document.getElementById('allAppointmentsTable');
+        if (apts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment requests found.</td></tr>';
+            return;
+        }
+
+        const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
+        const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
+
+        tbody.innerHTML = apts.map((a, i) => `
+            <tr class="border-b hover:bg-blue-50">
+                <td class="py-2 px-2 text-center">${i + 1}</td>
+                <td class="py-2 px-2">${a.userName}</td>
+                <td class="py-2 px-2">${a.userRole}</td>
+                <td class="py-2 px-2">${a.date}</td>
+                <td class="py-2 px-2">${a.time}</td>
+                <td class="py-2 px-2">${a.type}</td>
+                <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
+                <td class="py-2 px-2 text-center">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span>
+                </td>
+                <td class="py-2 px-2 text-center">
+                    ${a.status === 'pending' ? `
+                        <button onclick="approveAppointment(${a.id})" class="text-green-600 hover:text-green-800 mr-2" title="Approve">
+                            <i class="fa-solid fa-check"></i>
+                        </button>
+                        <button onclick="rejectAppointment(${a.id})" class="text-red-600 hover:text-red-800" title="Reject">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    ` : ''}
+                </td>
+            </tr>`).join('');
+    } catch (error) {
+        document.getElementById('allAppointmentsTable').innerHTML = 
+            `<tr><td colspan="9" class="py-8 text-center text-red-500">❌ ${error.message}</td></tr>`;
+    }
+}
+
+// === APPROVE APPOINTMENT ===
+async function approveAppointment(id) {
+    if (!confirm('✅ Approve this appointment?')) return;
+    try {
+        await api(`/api/appointments/${id}/approve`, { method: 'POST' });
+        alert('✅ Appointment approved!');
+        updateStats();
+        renderAllAppointments();
+        renderHistory(false);
+    } catch (error) {
+        alert(`❌ ${error.message}`);
+    }
+}
+
+// === REJECT APPOINTMENT ===
+async function rejectAppointment(id) {
+    if (!confirm('❌ Reject this appointment?')) return;
+    try {
+        await api(`/api/appointments/${id}/reject`, { method: 'POST' });
+        alert('❌ Appointment rejected.');
+        updateStats();
+        renderAllAppointments();
+        renderHistory(false);
+    } catch (error) {
+        alert(`❌ ${error.message}`);
+    }
+}
+
+// === RENDER APPOINTMENT HISTORY ===
+async function renderHistory(oldestFirst = false) {
+    try {
+        const data = await api('/api/appointments/all');
+        let apts = data.appointments;
+
+        // Sort by date/time
+        apts.sort((a, b) => {
+            const dateA = new Date(`${a.date}T${a.time}`);
+            const dateB = new Date(`${b.date}T${b.time}`);
+            return oldestFirst ? dateA - dateB : dateB - dateA;
+        });
+
+        const tbody = document.getElementById('historyTable');
+        if (apts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td></tr>';
+            return;
+        }
+
+        const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
+        const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
+
+        tbody.innerHTML = apts.map((a, i) => `
+            <tr class="border-b hover:bg-blue-50">
+                <td class="py-2 px-2 text-center">${i + 1}</td>
+                <td class="py-2 px-2">${a.userName}</td>
+                <td class="py-2 px-2">${a.userRole}</td>
+                <td class="py-2 px-2">${a.date}</td>
+                <td class="py-2 px-2">${a.time}</td>
+                <td class="py-2 px-2">${a.type}</td>
+                <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
+                <td class="py-2 px-2 text-center">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span>
+                </td>
+            </tr>`).join('');
+    } catch (error) {
+        document.getElementById('historyTable').innerHTML = 
+            `<tr><td colspan="8" class="py-8 text-center text-red-500">❌ ${error.message}</td></tr>`;
+    }
 }
 
 // === SEARCH PATIENT HISTORY ===
@@ -956,265 +1038,348 @@ async function searchPatientHistory() {
     const name = document.getElementById('searchPatientName').value.trim().toLowerCase();
     const resultDiv = document.getElementById('patientHistoryResult');
     const tableBody = document.getElementById('patientHistoryTable');
-    if (!name) { alert('⚠️ Enter patient name!'); return; }
-    let history;
+
+    if (!name) {
+        alert('⚠️ Please enter a name to search.');
+        return;
+    }
+
     try {
-        history = (await api('/api/appointments')).appointments
-            .filter(a => a.userName.toLowerCase().includes(name)).sort((a,b) => b.id - a.id);
-    } catch (error) { alert(`❌ ${error.message}`); return; }
-    resultDiv.classList.remove('hidden');
-    if (history.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">❌ No history found.</td></tr>';
-        return;
-    }
-    const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
-    const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
-    tableBody.innerHTML = history.map((a, i) => `
-        <tr class="border-b hover:bg-blue-50">
-            <td class="py-2 px-3">${i+1}</td>
-            <td class="py-2 px-3">${a.date}</td>
-            <td class="py-2 px-3">${a.time}</td>
-            <td class="py-2 px-3">${a.type}</td>
-            <td class="py-2 px-3 max-w-xs truncate">${a.reason}</td>
-            <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span></td>
-        </tr>`).join('');
-}
+        const data = await api('/api/appointments/all');
+        const matches = data.appointments.filter(a => 
+            a.userName.toLowerCase().includes(name)
+        );
 
-// === RENDER HISTORY ===
-async function renderHistory(oldestFirst = true) {
-    let apts;
-    try { apts = (await api('/api/appointments')).appointments; } catch (error) { return; }
-    apts.sort((a, b) => oldestFirst ? a.id - b.id : b.id - a.id);
-    const tbody = document.getElementById('historyTable');
-    if (apts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td></tr>';
-        return;
-    }
-    const roleText = { Student: '🎓 Student', Teacher: '📖 Teacher', Staff: '🏛️ Staff' };
-    const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
-    const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
-    tbody.innerHTML = apts.map((a, i) => `
-        <tr class="border-b border-gray-100 hover:bg-blue-50">
-            <td class="py-3 px-3 font-medium text-center">${i+1}</td>
-            <td class="py-3 px-3 font-semibold text-blue-800">${a.userName}</td>
-            <td class="py-3 px-3 text-sm">${roleText[a.userRole] || a.userRole}</td>
-            <td class="py-3 px-3">${a.date}</td>
-            <td class="py-3 px-3">${a.time}</td>
-            <td class="py-3 px-3 text-sm">${a.type}</td>
-            <td class="py-3 px-3 text-sm max-w-xs truncate">${a.reason}</td>
-            <td class="py-3 px-3 text-center"><span class="px-2 py-1 rounded text-xs font-semibold ${cls[a.status]}">${txt[a.status]}</span></td>
-        </tr>`).join('');
-}
+        resultDiv.classList.remove('hidden');
 
-// === RENDER ALL APPOINTMENTS ===
-async function renderAllAppointments() {
-    let apts;
-    try { apts = (await api('/api/appointments')).appointments; } catch (error) { return; }
-    const roleFilter = document.getElementById('filterRole').value;
-    const statusFilter = document.getElementById('filterStatus').value;
-    if (roleFilter !== 'all') apts = apts.filter(a => a.userRole === roleFilter);
-    if (statusFilter !== 'all') apts = apts.filter(a => a.status === statusFilter);
-    apts.sort((a,b) => b.id - a.id);
-    updateStats();
-    const tbody = document.getElementById('allAppointmentsTable');
-    if (apts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment requests found.</td></tr>';
-        return;
-    }
-    const roleText = { Student: '🎓 Student', Teacher: '📖 Teacher', Staff: '🏛️ Staff' };
-    const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
-    const txt = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
-    tbody.innerHTML = apts.map((a, i) => `
-        <tr class="border-b border-gray-100">
-            <td class="py-3 px-3 font-medium">${i+1}</td>
-            <td class="py-3 px-3 font-semibold text-blue-800">${a.userName}</td>
-            <td class="py-3 px-3 text-sm">${roleText[a.userRole] || a.userRole}</td>
-            <td class="py-3 px-3">${a.date}</td>
-            <td class="py-3 px-3">${a.time}</td>
-            <td class="py-3 px-3 text-sm">${a.type}</td>
-            <td class="py-3 px-3 text-sm max-w-xs">${a.reason}</td>
-            <td class="py-3 px-3 text-center"><span class="px-2 py-1 rounded text-xs font-semibold ${cls[a.status]}">${txt[a.status]}</span></td>
-            <td class="py-3 px-3 text-center">
-                ${a.status === 'pending' ? `
-                    <button onclick="updateStatus(${a.id}, 'approved')" class="bg-green-500 text-white px-2 py-1 rounded text-xs mr-1">✅ Approve</button>
-                    <button onclick="updateStatus(${a.id}, 'rejected')" class="bg-red-500 text-white px-2 py-1 rounded text-xs">❌ Reject</button>
-                ` : '<span class="text-gray-400 text-xs">—</span>'}
-            </td>
-        </tr>`).join('');
-}
+        if (matches.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">No records found for that name.</td></tr>';
+            return;
+        }
 
-// === UPDATE STATUS ===
-async function updateStatus(id, status) {
-    try {
-        await api(`/api/appointments/${id}/status`, {
-            method: 'PATCH', body: JSON.stringify({ status })
-        });
-        await renderAllAppointments();
-        await updateStats();
-    } catch (error) { alert(`❌ ${error.message}`); }
+        const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
+        const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
+
+        tableBody.innerHTML = matches.map((a, i) => `
+            <tr class="border-b hover:bg-blue-50">
+                <td class="py-2 px-2">${i + 1}</td>
+                <td class="py-2 px-2">${a.date}</td>
+                <td class="py-2 px-2">${a.time}</td>
+                <td class="py-2 px-2">${a.type}</td>
+                <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
+                <td class="py-2 px-2">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span>
+                </td>
+            </tr>`).join('');
+    } catch (error) {
+        resultDiv.classList.remove('hidden');
+        tableBody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">❌ ${error.message}</td></tr>`;
+    }
 }
 
 // === LOGOUT ===
 async function logoutSystem() {
-    try { await api('/api/logout', { method: 'POST' }); } catch (error) { /* Clear local UI even if server is unavailable. */ }
+    if (!confirm('Are you sure you want to log out?')) return;
+    try {
+        await api('/api/logout', { method: 'POST' });
+    } catch (error) {
+        console.warn('Logout API error:', error);
+    }
     currentUser = null;
-    selectedTimeSlot = null;
+    // Reset all views
+    document.getElementById('authSection').classList.remove('hidden');
     document.getElementById('userDashboard').classList.add('hidden');
     document.getElementById('nurseDashboard').classList.add('hidden');
-    document.getElementById('authSection').classList.remove('hidden');
+    // Reset forms
     document.getElementById('loginEmail').value = '';
     document.getElementById('loginPass').value = '';
     document.getElementById('authMsg').textContent = '';
     showAuthTab('login');
 }
 
-// === INITIALIZE ===
-api('/api/me').then(data => {
-    if (data.user) { currentUser = data.user; openDashboard(); }
+// === INITIALIZE ON PAGE LOAD ===
+document.addEventListener('DOMContentLoaded', () => {
+    setDateRestrictions();
 });
 </script>
-</body>
-</html>
 """
-
     return HTML_CONTENT
 
-
+# === API ROUTES ===
 @app.post("/api/register")
 def register():
-    data = request.get_json(silent=True) or {}
-    name = str(data.get("name", "")).strip()
-    email = str(data.get("email", "")).strip().lower()
-    password = str(data.get("password", ""))
-    role = data.get("role")
-    if not name or not email or len(password) < 6 or role not in {"Student", "Teacher", "Staff"}:
-        return jsonify(error="Please provide valid registration details."), 400
-    db = get_db()
-    try:
-        db.execute(
-            "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)",
-            (name, email, generate_password_hash(password), role),
-        )
-        db.commit()
-    except sqlite3.IntegrityError:
-        return jsonify(error="Email already registered."), 409
-    return jsonify(message="Account created successfully."), 201
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    role = data.get("role", "")
 
+    if not all([name, email, password, role]):
+        return jsonify(error="All fields are required."), 400
+    if role not in ("Student", "Teacher", "Staff"):
+        return jsonify(error="Invalid role selected."), 400
+
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        if cur.fetchone():
+            return jsonify(error="Email already registered."), 409
+
+        password_hash = generate_password_hash(password)
+        cur.execute(
+            "INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)",
+            (name, email, password_hash, role)
+        )
+        conn.commit()
+        return jsonify(message="Account created successfully!"), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify(error=f"Registration failed: {str(e)}"), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.post("/api/login")
 def login():
-    data = request.get_json(silent=True) or {}
-    email = str(data.get("email", "")).strip().lower()
-    password = str(data.get("password", ""))
-    user = get_db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-    if user is None or not check_password_hash(user["password_hash"], password):
-        return jsonify(error="Incorrect email or password."), 401
-    session.clear()
-    session["user_id"] = user["id"]
-    return jsonify(user=user_dict(user))
+    data = request.get_json()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
 
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id, name, email, password_hash, role FROM users WHERE email = %s", (email,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify(error="Email not found."), 401
+        if not check_password_hash(row[3], password):
+            return jsonify(error="Incorrect password."), 401
+
+        session["user_id"] = row[0]
+        return jsonify(user={
+            "id": row[0],
+            "name": row[1],
+            "email": row[2],
+            "role": row[4]
+        }), 200
+    except Exception as e:
+        return jsonify(error=f"Login failed: {str(e)}"), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.post("/api/logout")
 def logout():
-    session.clear()
-    return jsonify(message="Logged out.")
-
-
-@app.get("/api/me")
-def me():
-    user = current_user()
-    return jsonify(user=user_dict(user) if user else None)
-
-
-@app.get("/api/appointments")
-@login_required
-def appointments():
-    db = get_db()
-    query = """
-        SELECT a.*, u.name, u.email, u.role
-        FROM appointments a JOIN users u ON u.id = a.user_id
-    """
-    params = []
-    if g.user["role"] != "nurse":
-        query += " WHERE a.user_id = ?"
-        params.append(g.user["id"])
-    query += " ORDER BY a.id DESC"
-    rows = db.execute(query, params).fetchall()
-    return jsonify(appointments=[appointment_dict(row) for row in rows])
-
+    session.pop("user_id", None)
+    return jsonify(message="Logged out successfully."), 200
 
 @app.get("/api/appointments/slots")
 @login_required
-def available_slots():
-    selected_date = request.args.get("date", "")
-    try:
-        chosen = date.fromisoformat(selected_date)
-    except ValueError:
-        return jsonify(error="Invalid date."), 400
-    if chosen.weekday() >= 5:
-        return jsonify(slots=[], message="Appointments are Monday-Friday only.")
-    taken = get_db().execute(
-        "SELECT time FROM appointments WHERE date = ?", (selected_date,)
-    ).fetchall()
-    taken_times = {row["time"] for row in taken}
-    return jsonify(slots=[slot for slot in TIME_SLOTS if slot not in taken_times], taken=list(taken_times))
+def get_taken_slots():
+    selected_date = request.args.get("date")
+    if not selected_date:
+        return jsonify(error="Date is required."), 400
 
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT time FROM appointments WHERE date = %s AND status != 'rejected'", (selected_date,))
+        taken = [row[0] for row in cur.fetchall()]
+        return jsonify(taken=taken), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.post("/api/appointments")
 @login_required
 def create_appointment():
-    data = request.get_json(silent=True) or {}
-    selected_date = str(data.get("date", ""))
-    selected_time = str(data.get("time", ""))
-    reason = str(data.get("reason", "")).strip()
-    visit_type = str(data.get("type", "")).strip()
-    try:
-        chosen = date.fromisoformat(selected_date)
-    except ValueError:
-        return jsonify(error="Please choose a valid date."), 400
-    if chosen.weekday() >= 5 or selected_time not in TIME_SLOTS or not reason or not visit_type:
-        return jsonify(error="Please select a weekday, available time, visit type, and purpose."), 400
-    try:
-        db = get_db()
-        db.execute(
-            "INSERT INTO appointments (user_id, date, time, type, reason) VALUES (?, ?, ?, ?, ?)",
-            (g.user["id"], selected_date, selected_time, visit_type, reason),
-        )
-        db.commit()
-    except sqlite3.IntegrityError:
-        return jsonify(error="Sorry, that time slot was just taken."), 409
-    return jsonify(message="Appointment submitted."), 201
+    data = request.get_json()
+    date = data.get("date")
+    time = data.get("time")
+    apt_type = data.get("type")
+    reason = data.get("reason")
 
+    if not all([date, time, apt_type, reason]):
+        return jsonify(error="All fields are required."), 400
 
-@app.patch("/api/appointments/<int:appointment_id>/status")
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO appointments (user_id, date, time, type, reason)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (g.user["id"], date, time, apt_type, reason))
+        conn.commit()
+        return jsonify(message="Appointment submitted successfully!"), 201
+    except Exception as e:
+        conn.rollback()
+        if "unique constraint" in str(e).lower():
+            return jsonify(error="This time slot has already been booked."), 409
+        return jsonify(error=f"Failed to create appointment: {str(e)}"), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.get("/api/appointments")
+@login_required
+def get_my_appointments():
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.user_id = %s
+            ORDER BY a.date DESC, a.time DESC
+        """, (g.user["id"],))
+        appointments = [
+            {
+                "id": row[0],
+                "userName": row[1],
+                "userRole": row[2],
+                "date": row[3],
+                "time": row[4],
+                "type": row[5],
+                "reason": row[6],
+                "status": row[7]
+            }
+            for row in cur.fetchall()
+        ]
+        return jsonify(appointments=appointments), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.get("/api/appointments/all")
 @nurse_required
-def update_appointment_status(appointment_id):
-    data = request.get_json(silent=True) or {}
-    status = data.get("status")
-    if status not in {"approved", "rejected"}:
-        return jsonify(error="Invalid appointment status."), 400
-    db = get_db()
-    cursor = db.execute(
-        "UPDATE appointments SET status = ? WHERE id = ?", (status, appointment_id)
-    )
-    db.commit()
-    if cursor.rowcount == 0:
-        return jsonify(error="Appointment not found."), 404
-    return jsonify(message="Appointment status updated.")
+def get_all_appointments():
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
 
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            ORDER BY a.created_at DESC
+        """)
+        appointments = [
+            {
+                "id": row[0],
+                "userName": row[1],
+                "userRole": row[2],
+                "date": row[3],
+                "time": row[4],
+                "type": row[5],
+                "reason": row[6],
+                "status": row[7]
+            }
+            for row in cur.fetchall()
+        ]
+        return jsonify(appointments=appointments), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+        conn.close()
 
-@app.get("/api/health")
-def health():
-    return jsonify(status="ok")
+@app.post("/api/appointments/<int:apt_id>/approve")
+@nurse_required
+def approve(apt_id):
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
 
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE appointments SET status = 'approved' WHERE id = %s", (apt_id,))
+        if cur.rowcount == 0:
+            return jsonify(error="Appointment not found."), 404
+        conn.commit()
+        return jsonify(message="Appointment approved."), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+        conn.close()
 
-init_db()
+@app.post("/api/appointments/<int:apt_id>/reject")
+@nurse_required
+def reject(apt_id):
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
 
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE appointments SET status = 'rejected' WHERE id = %s", (apt_id,))
+        if cur.rowcount == 0:
+            return jsonify(error="Appointment not found."), 404
+        conn.commit()
+        return jsonify(message="Appointment rejected."), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.get("/api/stats")
+@nurse_required
+def get_stats():
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM appointments")
+        total = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM appointments WHERE status = 'pending'")
+        pending = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM appointments WHERE status = 'approved'")
+        approved = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM appointments WHERE status = 'rejected'")
+        rejected = cur.fetchone()[0]
+
+        return jsonify({
+            "newRequests": total,
+            "pending": pending,
+            "approved": approved,
+            "rejected": rejected
+        }), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+        conn.close()
+
+# === RUN SERVER ===
 if __name__ == "__main__":
-    app.run(
-        host=os.environ.get("CLINIC_HOST", "0.0.0.0"),
-        port=int(os.environ.get("PORT", os.environ.get("CLINIC_PORT", "5050"))),
-        debug=os.environ.get("FLASK_DEBUG", "0") == "1",
-        threaded=False,
-    )
-
+    with app.app_context():
+        init_db()
+    app.run(host="0.0.0.0", port=5050, debug=True)

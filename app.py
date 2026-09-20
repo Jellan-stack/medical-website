@@ -3,11 +3,10 @@ from functools import wraps
 import os
 from pathlib import Path
 import psycopg2  # ✅ Ginamit ang tamang package
-
-app = Flask(__name__)
 from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
+app = Flask(__name__)
 # === DATABASE CONFIGURATION ===
 DATABASE_URL = os.environ.get("DATABASE_URL")
 

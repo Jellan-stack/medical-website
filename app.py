@@ -6,9 +6,15 @@ import psycopg2  # ✅ Ginamit ang tamang package
 from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-app = Flask(__name__)
 # === DATABASE CONFIGURATION ===
 DATABASE_URL = os.environ.get("DATABASE_URL")
+BASE_DIR = Path(__file__).resolve().parent
+app = Flask(__name__, static_folder=str(BASE_DIR), static_url_path="")
+app.config["SECRET_KEY"] = os.environ.get(
+    "CLINIC_SECRET_KEY", "change-this-secret-key-in-production"
+)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # ✅ IISA LANG NG GET_DB FUNCTION — PARA SA POSTGRESQL
 def get_db():
@@ -27,18 +33,10 @@ def close_db(_error):
     if db is not None:
         db.close()
 
-BASE_DIR = Path(__file__).resolve().parent
 TIME_SLOTS = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
 ]
-
-app = Flask(__name__, static_folder=str(BASE_DIR), static_url_path="")
-app.config["SECRET_KEY"] = os.environ.get(
-    "CLINIC_SECRET_KEY", "change-this-secret-key-in-production"
-)
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # === DATABASE INITIALIZATION — POSTGRESQL SYNTAX ===
 def init_db():
@@ -895,7 +893,7 @@ async function renderMyAppointments() {
             <td class="py-2 px-2"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span></td>
         </tr>`).join('');
 }
-# === UPDATE STATISTICS ===
+// === UPDATE STATISTICS ===
 async function updateStats() {
     try {
         const data = await api('/api/stats');

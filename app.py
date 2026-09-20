@@ -2,10 +2,24 @@ from datetime import date, datetime
 from functools import wraps
 import os
 from pathlib import Path
-import sqlite3
-
+import psycopg2  # ✅ Ginamit ang tamang package
 from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
+
+# === DATABASE CONFIGURATION ===
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# ✅ IISA LANG NG GET_DB FUNCTION — PARA SA POSTGRESQL
+def get_db():
+    if "db" not in g:
+        try:
+            g.db = psycopg2.connect(DATABASE_URL)
+            g.db.autocommit = False
+        except Exception as e:
+            print(f"❌ DB Connection Error: {e}")
+            return None
+    return g.db
+
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE = Path(

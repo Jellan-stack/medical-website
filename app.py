@@ -64,12 +64,14 @@ def init_db():
             time TEXT NOT NULL,
             type TEXT NOT NULL,
             reason TEXT NOT NULL,
+            rejection_reason TEXT,
             status TEXT NOT NULL DEFAULT 'pending'
                 CHECK(status IN ('pending', 'approved', 'rejected')),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(date, time)
         );
     """)
+    cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rejection_reason TEXT")
     
     cur.execute("SELECT id FROM users WHERE email = %s", ("nurse@school.ph",))
     nurse = cur.fetchone()
@@ -410,10 +412,11 @@ def index():
                             <th class="py-2 px-2">Type</th>
                             <th class="py-2 px-2">Purpose</th>
                             <th class="py-2 px-2">Status</th>
+                            <th class="py-2 px-2">Rejection Reason</th>
                         </tr>
                     </thead>
                     <tbody id="myAppointmentsTable">
-                        <tr><td colspan="6" class="py-4 text-center text-gray-400 italic">No appointments yet.</td></tr>
+                        <tr><td colspan="7" class="py-4 text-center text-gray-400 italic">No appointments yet.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -882,12 +885,12 @@ async function renderMyAppointments() {
     let apts;
     try { apts = (await api('/api/appointments')).appointments; }
     catch (error) {
-        document.getElementById('myAppointmentsTable').innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">${error.message}</td></tr>`;
+        document.getElementById('myAppointmentsTable').innerHTML = `<tr><td colspan="7" class="py-4 text-center text-red-500">${error.message}</td></tr>`;
         return;
     }
     const tbody = document.getElementById('myAppointmentsTable');
     if (apts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">No appointments yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-gray-400 italic">No appointments yet.</td></tr>';
         return;
     }
     const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
@@ -900,6 +903,7 @@ async function renderMyAppointments() {
             <td class="py-2 px-2">${a.type}</td>
             <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
             <td class="py-2 px-2"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span></td>
+            <td class="py-2 px-2 max-w-xs">${a.status === 'rejected' ? (a.rejectionReason || 'No reason provided.') : '—'}</td>
         </tr>`).join('');
 }
 // === UPDATE STATISTICS ===
@@ -988,9 +992,18 @@ async function approveAppointment(id) {
 
 // === REJECT APPOINTMENT ===
 async function rejectAppointment(id) {
+    const rejectionReason = window.prompt('Enter the reason for rejecting this appointment:');
+    if (rejectionReason === null) return;
+    if (!rejectionReason.trim()) {
+        alert('⚠️ A rejection reason is required.');
+        return;
+    }
     if (!confirm('❌ Reject this appointment?')) return;
     try {
-        await api(`/api/appointments/${id}/reject`, { method: 'POST' });
+        await api(`/api/appointments/${id}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ rejectionReason: rejectionReason.trim() })
+        });
         alert('❌ Appointment rejected.');
         updateStats();
         renderAllAppointments();
@@ -1253,7 +1266,7 @@ def get_my_appointments():
     try:
         cur = conn.cursor()
         cur.execute("""
-            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status
+            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status, a.rejection_reason
             FROM appointments a
             JOIN users u ON a.user_id = u.id
             WHERE a.user_id = %s
@@ -1268,7 +1281,8 @@ def get_my_appointments():
                 "time": row[4],
                 "type": row[5],
                 "reason": row[6],
-                "status": row[7]
+                "status": row[7],
+                "rejectionReason": row[8]
             }
             for row in cur.fetchall()
         ]
@@ -1289,7 +1303,7 @@ def get_all_appointments():
     try:
         cur = conn.cursor()
         cur.execute("""
-            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status
+            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status, a.rejection_reason
             FROM appointments a
             JOIN users u ON a.user_id = u.id
             ORDER BY a.created_at DESC
@@ -1303,7 +1317,8 @@ def get_all_appointments():
                 "time": row[4],
                 "type": row[5],
                 "reason": row[6],
-                "status": row[7]
+                "status": row[7],
+                "rejectionReason": row[8]
             }
             for row in cur.fetchall()
         ]
@@ -1338,13 +1353,21 @@ def approve(apt_id):
 @app.post("/api/appointments/<int:apt_id>/reject")
 @nurse_required
 def reject(apt_id):
+    data = request.get_json(silent=True) or {}
+    rejection_reason = data.get("rejectionReason", "").strip()
+    if not rejection_reason:
+        return jsonify(error="A rejection reason is required."), 400
+
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
 
     try:
         cur = conn.cursor()
-        cur.execute("UPDATE appointments SET status = 'rejected' WHERE id = %s", (apt_id,))
+        cur.execute(
+            "UPDATE appointments SET status = 'rejected', rejection_reason = %s WHERE id = %s",
+            (rejection_reason, apt_id),
+        )
         if cur.rowcount == 0:
             return jsonify(error="Appointment not found."), 404
         conn.commit()

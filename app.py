@@ -508,14 +508,29 @@ def index():
                 </div>
             </div>
             <div class="dashboard-card p-4 mb-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-3">🔍 Search Patient History</h3>
-                <div class="flex flex-col md:flex-row gap-3">
-                    <input type="text" id="searchPatientName" placeholder="Type patient name..." 
-                        class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button onclick="searchPatientHistory()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold">
-                        <i class="fa-solid fa-magnifying-glass mr-2"></i> Search
-                    </button>
-                </div>
+    <h3 class="text-lg font-bold text-gray-800 mb-3">🔍 Search Patient History</h3>
+    
+    <!-- Search Bar - Responsive -->
+    <div class="flex flex-col sm:flex-row gap-3 mb-4">
+        <input type="text" id="searchPatientName" placeholder="Type patient name..." 
+            class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full">
+        <button onclick="searchPatientHistory()" 
+            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold whitespace-nowrap w-full sm:w-auto">
+            <i class="fa-solid fa-magnifying-glass mr-2"></i> Search
+        </button>
+    </div>
+
+    <!-- RESULT CONTAINER — ITO ANG PINAKAIMPORTANTENG INAYOS -->
+    <div id="searchResult" class="mt-2 w-full overflow-x-auto">
+        <!-- Lalabas dito ang detalye ng pasyente -->
+        <div class="min-w-max">
+            <!-- Siguraduhin na ang laman dito ay gumagamit ng:
+                 - wrap text, hindi pilit na mahahaba
+                 - responsive table o card-based layout sa phone
+            -->
+        </div>
+    </div>
+</div>
                 <div id="patientHistoryResult" class="mt-4 hidden">
                     <h4 class="font-bold text-gray-700 mb-2">📋 Appointment History:</h4>
                     <div class="history-panel border rounded-lg overflow-hidden">

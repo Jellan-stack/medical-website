@@ -551,44 +551,49 @@ def index():
                 </div>
             </div>
         </div>
-        <!-- APPOINTMENT HISTORY VIEW -->
-        <div id="nurseViewHistory" class="hidden fade-in">
-            <div class="dashboard-card p-6">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
-                    <h3 class="text-lg font-bold text-gray-800">
-                        <i class="fa-solid fa-clock-rotate-left mr-2 text-blue-600"></i> Appointment History
-                        <span class="text-sm font-normal text-gray-500 ml-2">(Chronological Order)</span>
-                    </h3>
-                    <div class="flex gap-2">
-                        <button onclick="renderHistory(true)" class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
-                            <i class="fa-solid fa-arrow-up-short-wide mr-1"></i> Oldest First
-                        </button>
-                        <button onclick="renderHistory(false)" class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
-                            <i class="fa-solid fa-arrow-down-wide-short mr-1"></i> Newest First
-                        </button>
-                    </div>
-                </div>
-                <div class="overflow-x-auto history-panel">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50">
-                            <tr class="text-left text-gray-600 border-b-2 border-gray-200">
-                                <th class="py-3 px-3 font-semibold text-center">#</th>
-                                <th class="py-3 px-3 font-semibold">Name</th>
-                                <th class="py-3 px-3 font-semibold">Role</th>
-                                <th class="py-3 px-3 font-semibold">Date</th>
-                                <th class="py-3 px-3 font-semibold">Time</th>
-                                <th class="py-3 px-3 font-semibold">Visit Type</th>
-                                <th class="py-3 px-3 font-semibold">Purpose</th>
-                                <th class="py-3 px-3 font-semibold text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="historyTable">
-                            <tr><td colspan="8" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+      <!-- APPOINTMENT HISTORY VIEW -->
+<div id="nurseViewHistory" class="hidden fade-in">
+    <div class="dashboard-card p-4 sm:p-6">
+        <!-- Header & Sort Buttons - Responsive Layout -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+            <h3 class="text-lg font-bold text-gray-800">
+                <i class="fa-solid fa-clock-rotate-left mr-2 text-blue-600"></i> Appointment History
+                <span class="text-sm font-normal text-gray-500 ml-2">(Chronological Order)</span>
+            </h3>
+            <div class="flex gap-2 w-full sm:w-auto">
+                <button onclick="renderHistory(true)" class="flex-1 sm:flex-none px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+                    <i class="fa-solid fa-arrow-up-short-wide mr-1"></i> Oldest First
+                </button>
+                <button onclick="renderHistory(false)" class="flex-1 sm:flex-none px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+                    <i class="fa-solid fa-arrow-down-wide-short mr-1"></i> Newest First
+                </button>
             </div>
         </div>
+
+        <!-- ✅ Pinakaayos na Scrollable Table Container -->
+        <div class="w-full overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+            <table class="w-full text-sm min-w-max">
+                <thead class="bg-gray-50">
+                    <tr class="text-left text-gray-600 border-b-2 border-gray-200">
+                        <th class="py-3 px-3 font-semibold text-center whitespace-nowrap">#</th>
+                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Name</th>
+                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Role</th>
+                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Date</th>
+                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Time</th>
+                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Visit Type</th>
+                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Purpose</th>
+                        <th class="py-3 px-3 font-semibold text-center whitespace-nowrap">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTable">
+                    <tr>
+                        <td colspan="8" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
         <!-- ALL APPOINTMENTS VIEW -->
         <div id="nurseViewAppointments" class="hidden fade-in">
             <div class="dashboard-card p-6">

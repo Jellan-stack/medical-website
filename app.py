@@ -520,29 +520,18 @@ def index():
         </button>
     </div>
 
-    <!-- RESULT CONTAINER — ITO ANG PINAKAIMPORTANTENG INAYOS -->
-    <div id="searchResult" class="mt-2 w-full overflow-x-auto">
-        <!-- Lalabas dito ang detalye ng pasyente -->
-        <div class="min-w-max">
-            <!-- Siguraduhin na ang laman dito ay gumagamit ng:
-                 - wrap text, hindi pilit na mahahaba
-                 - responsive table o card-based layout sa phone
-            -->
-        </div>
-    </div>
-</div>
                 <div id="patientHistoryResult" class="mt-4 hidden">
                     <h4 class="font-bold text-gray-700 mb-2">📋 Appointment History:</h4>
-                    <div class="history-panel border rounded-lg overflow-hidden">
-                        <table class="w-full text-sm">
+                    <div class="history-panel overflow-x-auto border rounded-lg">
+                        <table class="w-full min-w-max text-sm">
                             <thead class="bg-gray-100">
                                 <tr>
-                                    <th class="py-2 px-3 text-left">#</th>
-                                    <th class="py-2 px-3 text-left">Date</th>
-                                    <th class="py-2 px-3 text-left">Time</th>
-                                    <th class="py-2 px-3 text-left">Type</th>
-                                    <th class="py-2 px-3 text-left">Symptoms</th>
-                                    <th class="py-2 px-3 text-left">Status</th>
+                                    <th class="py-2 px-3 text-left whitespace-nowrap">#</th>
+                                    <th class="py-2 px-3 text-left whitespace-nowrap">Date</th>
+                                    <th class="py-2 px-3 text-left whitespace-nowrap">Time</th>
+                                    <th class="py-2 px-3 text-left whitespace-nowrap">Type</th>
+                                    <th class="py-2 px-3 text-left whitespace-nowrap">Symptoms</th>
+                                    <th class="py-2 px-3 text-left whitespace-nowrap">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="patientHistoryTable"></tbody>

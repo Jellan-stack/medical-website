@@ -263,7 +263,7 @@ def index():
         <!-- Logo + Title - Nakasentro at Walang Background -->
         <div class="text-center mb-8">
             <img 
-                src="slsu.png" 
+                src="slsu.png.png" 
                 class="w-20 h-20 object-contain mx-auto mb-3 bg-transparent p-0 border-0"
                 alt="SLSU Logo"
             >

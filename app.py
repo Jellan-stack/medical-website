@@ -260,12 +260,17 @@ def index():
 <!-- 🔐 LOGIN PAGE -->
 <div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4">
     <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
+        <!-- Logo + Title - Nakasentro at Walang Background -->
         <div class="text-center mb-8">
-
-<img src="slsu.png.png" class="w-16 h-16 object-contain mb-2">
+            <img 
+                src="slsu.png.png" 
+                class="w-20 h-20 object-contain mx-auto mb-3 bg-transparent p-0 border-0"
+                alt="SLSU Logo"
+            >
             <h1 class="text-2xl font-bold text-gray-800">Clinic Appointment System</h1>
             <p class="text-gray-500">School Clinic Appointment System</p>
         </div>
+
         <div class="flex mb-6 border-b border-gray-200">
             <button id="tabLogin" class="flex-1 py-3 text-center tab-active" onclick="showAuthTab('login')">
                 <i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In

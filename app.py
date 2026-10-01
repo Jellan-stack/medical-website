@@ -261,8 +261,8 @@ def index():
 <div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4">
     <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
         <div class="text-center mb-8">
-            <!-- Pinalitan ang: <i class="fa-solid fa-heart-pulse text-4xl text-red-500 mb-2"></i> -->
-<img src="https://slsu.edu.ph/images/slsu-logo.png" alt="SLSU Logo" class="w-16 h-16 object-contain mb-2">
+
+<img src="slsu.png" class="w-16 h-16 object-contain mb-2">
             <h1 class="text-2xl font-bold text-gray-800">Clinic Appointment System</h1>
             <p class="text-gray-500">School Clinic Appointment System</p>
         </div>

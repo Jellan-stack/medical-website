@@ -330,7 +330,7 @@ def index():
     <!-- Mobile Menu Button -->
     <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
         <span class="font-bold">Clinic</span>
-        <button id="userMenuBtn" class="text-xl">?</button>
+        <button id="userMenuBtn" class="text-xl"></button>
     </div>
     <!-- Sidebar -->
     <aside id="userSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
@@ -430,7 +430,7 @@ def index():
             <span class="font-bold">NURSE PANEL</span>
             <p class="text-xs text-blue-200">Clinic Management</p>
         </div>
-        <button id="nurseMenuBtn" class="text-xl">?</button>
+        <button id="nurseMenuBtn" class="text-xl"></button>
     </div>
     <!-- Sidebar -->
     <aside id="nurseSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
@@ -559,7 +559,7 @@ def index():
                 </button>
             </div>
         </div>
-        <!-- ? Pinakaayos na Scrollable Table Container -->
+        <!--  Pinakaayos na Scrollable Table Container -->
         <div class="w-full overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
             <table class="w-full text-sm min-w-max">
                 <thead class="bg-gray-50">
@@ -820,7 +820,7 @@ async function registerUser() {
     }
     try {
         await api('/api/register', { method: 'POST', body: JSON.stringify({ name, email, password: pass, role }) });
-        msg.textContent = '? Account created! Please sign in.'; msg.className = 'text-green-500';
+        msg.textContent = ' Account created! Please sign in.'; msg.className = 'text-green-500';
         setTimeout(() => showAuthTab('login'), 1500);
     } catch (error) {
         msg.textContent = `? ${error.message}`; msg.className = 'text-red-500';
@@ -915,9 +915,9 @@ async function submitAppointment() {
         await api('/api/appointments', {
             method: 'POST', body: JSON.stringify({ date, time, type, reason })
         });
-        alert('? Appointment submitted!');
+        alert(' Appointment submitted!');
     } catch (error) {
-        alert(`? ${error.message}`);
+        alert(` ${error.message}`);
         loadAvailableTimeSlots();
         return;
     } finally {
@@ -1107,13 +1107,13 @@ async function submitReschedule() {
             method: 'POST',
             body: JSON.stringify({ date: newDate, time: newTime, reason })
         });
-        alert('? Appointment rescheduled.');
+        alert(' Appointment rescheduled.');
         closeRescheduleModal();
         updateStats();
         renderAllAppointments();
         renderHistory(false);
     } catch (error) {
-        alert(`? ${error.message}`);
+        alert(` ${error.message}`);
         loadRescheduleSlots();
     } finally {
         btn.disabled = false;
@@ -1126,18 +1126,18 @@ async function deleteAppointment(id) {
     try {
         await api(`/api/appointments/${id}`, { method: 'DELETE' });
         delete aptCache[id];
-        alert('? Appointment deleted.');
+        alert(' Appointment deleted.');
         updateStats();
         renderAllAppointments();
         renderHistory(false);
     } catch (error) {
-        alert(`? ${error.message}`);
+        alert(` ${error.message}`);
     }
 }
 // === PRINT APPOINTMENT DETAILS ===
 function printAppointment(id) {
     const a = aptCache[id];
-    if (!a) { alert('? Appointment details not found.'); return; }
+    if (!a) { alert(' Appointment details not found.'); return; }
     const st = statusInfo(a);
     const rows = [
         ['Patient Name', a.userName],

@@ -1040,10 +1040,10 @@ async function renderAllAppointments() {
 }
 // === APPROVE APPOINTMENT ===
 async function approveAppointment(id) {
-    if (!confirm('? Approve this appointment?')) return;
+    if (!confirm(' Approve this appointment?')) return;
     try {
         await api(`/api/appointments/${id}/approve`, { method: 'POST' });
-        alert('? Appointment approved!');
+        alert(' Appointment approved!');
         updateStats();
         renderAllAppointments();
         renderHistory(false);

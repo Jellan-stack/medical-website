@@ -264,11 +264,11 @@ def index():
             <h1 class="text-2xl font-bold text-gray-800">Clinic Appointment System</h1>
             <p class="text-gray-500">School Clinic Appointment System</p>
         </div>
-        <div class="flex mb-6 border-b border-black-200">
+        <div class="flex mb-6 border-b border-gray-200">
             <button id="tabLogin" class="flex-1 py-3 text-center tab-active" onclick="showAuthTab('login')">
                 <i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In
             </button>
-            <button id="tabRegister" class="flex-1 py-3 text-center text-black-500" onclick="showAuthTab('register')">
+            <button id="tabRegister" class="flex-1 py-3 text-center text-gray-500" onclick="showAuthTab('register')">
                 <i class="fa-solid fa-user-plus mr-2"></i> Create Account
             </button>
         </div>

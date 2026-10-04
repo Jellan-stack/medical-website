@@ -150,7 +150,7 @@ def index():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>?? School Clinic - Appointment System</title>
+    <title> School Clinic - Appointment System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <style>
@@ -262,7 +262,7 @@ def index():
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-<!-- ?? LOGIN PAGE -->
+<!--  LOGIN PAGE -->
 <div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4">
     <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
         <!-- Logo + Title - Nakasentro at Walang Background -->
@@ -324,9 +324,9 @@ def index():
                 <div>
                     <label class="block text-gray-700 font-medium mb-1">You are a...</label>
                     <select id="regRole" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                        <option value="Student"> ?? Student</option>
-                        <option value="Teacher"> ?? Teacher</option>
-                        <option value="Staff"> ??? Staff</option>
+                        <option value="Student">  Student</option>
+                        <option value="Teacher">  Teacher</option>
+                        <option value="Staff">  Staff</option>
                     </select>
                 </div>
                 <button onclick="registerUser()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold">
@@ -337,7 +337,7 @@ def index():
         <p id="authMsg" class="mt-4 text-center font-medium"></p>
     </div>
 </div>
-<!-- ?? USER DASHBOARD -->
+<!--  USER DASHBOARD -->
 <div id="userDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
     <!-- Mobile Menu Button -->
     <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
@@ -377,7 +377,7 @@ def index():
             </button>
         </div>
         <div class="dashboard-card p-6 mb-6 fade-in">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">?? Book an Appointment</h3>
+            <h3 class="text-lg font-bold text-gray-800 mb-4"> Book an Appointment</h3>
             <div class="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-gray-600 text-sm font-medium mb-1">Select Date (Monday–Friday only)</label>
@@ -412,7 +412,7 @@ def index():
             </button>
         </div>
         <div class="dashboard-card p-6 fade-in">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">?? My Appointments</h3>
+            <h3 class="text-lg font-bold text-gray-800 mb-4"> My Appointments</h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
@@ -434,7 +434,7 @@ def index():
         </div>
     </main>
 </div>
-<!-- ????? NURSE DASHBOARD -->
+<!--  NURSE DASHBOARD -->
 <div id="nurseDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
     <!-- Mobile Menu Button -->
     <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
@@ -522,7 +522,7 @@ def index():
                 </div>
             </div>
             <div class="dashboard-card p-4 mb-6">
-    <h3 class="text-lg font-bold text-gray-800 mb-3">?? Search Patient History</h3>
+    <h3 class="text-lg font-bold text-gray-800 mb-3"> Search Patient History</h3>
     
     <!-- Search Bar - Responsive -->
     <div class="flex flex-col sm:flex-row gap-3 mb-4">
@@ -535,7 +535,7 @@ def index():
     </div>
 
                 <div id="patientHistoryResult" class="mt-4 hidden">
-                    <h4 class="font-bold text-gray-700 mb-2">?? Appointment History:</h4>
+                    <h4 class="font-bold text-gray-700 mb-2"> Appointment History:</h4>
                     <div class="history-panel overflow-x-auto border rounded-lg">
                         <table class="w-full min-w-max text-sm">
                             <thead class="bg-gray-100">
@@ -602,7 +602,7 @@ def index():
         <div id="nurseViewAppointments" class="hidden fade-in">
             <div class="dashboard-card p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
-                    <h3 class="text-lg font-bold text-gray-800">?? ALL Clinic Appointments</h3>
+                    <h3 class="text-lg font-bold text-gray-800"> ALL Clinic Appointments</h3>
                     <div class="flex gap-2">
                         <select id="filterRole" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm">
                             <option value="all">All Roles</option>
@@ -768,7 +768,7 @@ async function loadAvailableTimeSlots() {
     const dateObj = new Date(selectedDate + 'T00:00:00');
     const dayOfWeek = dateObj.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
-        container.innerHTML = '<span class="text-red-500 text-sm col-span-3">?? Appointments are Monday–Friday only.</span>';
+        container.innerHTML = '<span class="text-red-500 text-sm col-span-3"> Appointments are Monday–Friday only.</span>';
         document.getElementById('aptTime').value = '';
         selectedTimeSlot = null;
         return;
@@ -828,10 +828,10 @@ async function registerUser() {
     const role = document.getElementById('regRole').value;
     const msg = document.getElementById('authMsg');
     if (!name || !email || !pass) {
-        msg.textContent = '?? Please fill in all fields!'; msg.className = 'text-orange-500'; return;
+        msg.textContent = ' Please fill in all fields!'; msg.className = 'text-orange-500'; return;
     }
     if (pass.length < 6) {
-        msg.textContent = '?? Password must be at least 6 characters!'; msg.className = 'text-orange-500'; return;
+        msg.textContent = ' Password must be at least 6 characters!'; msg.className = 'text-orange-500'; return;
     }
     try {
         await api('/api/register', { method: 'POST', body: JSON.stringify({ name, email, password: pass, role }) });
@@ -848,7 +848,7 @@ async function loginUser() {
     const msg = document.getElementById('authMsg');
     const loginButton = document.getElementById('loginButton');
     if (!email || !pass) {
-        msg.textContent = '?? Enter your email and password.';
+        msg.textContent = ' Enter your email and password.';
         msg.className = 'text-orange-500';
         return;
     }
@@ -900,7 +900,7 @@ function openDashboard() {
     } else {
         document.getElementById('userDashboard').classList.remove('hidden');
         document.getElementById('displayName').textContent = currentUser.name;
-        const labels = { Student: '?? Student', Teacher: '?? Teacher', Staff: '??? Staff' };
+        const labels = { Student: ' Student', Teacher: ' Teacher', Staff: ' Staff' };
         document.getElementById('displayRole').textContent = labels[currentUser.role];
         renderMyAppointments();
         setDateRestrictions();
@@ -914,7 +914,7 @@ async function submitAppointment() {
     const type = document.getElementById('aptType').value;
     const reason = document.getElementById('aptReason').value.trim();
     if (!date || !time || !reason) { 
-        alert('?? Please select a date, available time slot, and fill in purpose!'); 
+        alert(' Please select a date, available time slot, and fill in purpose!'); 
         return; 
     }
     const submitButton = document.getElementById('submitAppointmentButton');
@@ -1114,8 +1114,8 @@ async function submitReschedule() {
     const reason = document.getElementById('rsReason').value.trim();
     const newDate = document.getElementById('rsDate').value;
     const newTime = document.getElementById('rsTime').value;
-    if (!reason) { alert('?? Please enter the reason for rescheduling first.'); return; }
-    if (!newDate || !newTime) { alert('?? Please select the new date and time.'); return; }
+    if (!reason) { alert(' Please enter the reason for rescheduling first.'); return; }
+    if (!newDate || !newTime) { alert(' Please select the new date and time.'); return; }
     const btn = document.getElementById('rsSubmitBtn');
     btn.disabled = true;
     btn.classList.add('opacity-60', 'cursor-not-allowed');
@@ -1140,7 +1140,7 @@ async function submitReschedule() {
 
 // === DELETE APPOINTMENT ===
 async function deleteAppointment(id) {
-    if (!confirm('?? Delete this appointment permanently? This cannot be undone.')) return;
+    if (!confirm(' Delete this appointment permanently? This cannot be undone.')) return;
     try {
         await api(`/api/appointments/${id}`, { method: 'DELETE' });
         delete aptCache[id];
@@ -1178,7 +1178,7 @@ function printAppointment(id) {
         '<tr><th>' + esc(r[0]) + '</th><td>' + esc(r[1]) + '</td></tr>'
     ).join('');
     const w = window.open('', '_blank', 'width=800,height=700');
-    if (!w) { alert('?? Please allow pop-ups to print.'); return; }
+    if (!w) { alert(' Please allow pop-ups to print.'); return; }
     w.document.write(
         '<html><head><title>Appointment #' + a.id + '</title>' +
         '<style>' +
@@ -1260,7 +1260,7 @@ async function searchPatientHistory() {
     const tableBody = document.getElementById('patientHistoryTable');
 
     if (!name) {
-        alert('?? Please enter a name to search.');
+        alert(' Please enter a name to search.');
         return;
     }
 

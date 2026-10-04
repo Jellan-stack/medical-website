@@ -2,7 +2,7 @@ from datetime import date, datetime
 from functools import wraps
 import os
 from pathlib import Path
-import psycopg2  # ✅ Ginamit ang tamang package
+import psycopg2  # ? Ginamit ang tamang package
 from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -16,14 +16,14 @@ app.config["SECRET_KEY"] = os.environ.get(
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
-# ✅ IISA LANG NG GET_DB FUNCTION — PARA SA POSTGRESQL
+# ? IISA LANG NG GET_DB FUNCTION — PARA SA POSTGRESQL
 def get_db():
     if "db" not in g:
         try:
             g.db = psycopg2.connect(DATABASE_URL)
             g.db.autocommit = False
         except Exception as e:
-            print(f"❌ DB Connection Error: {e}")
+            print(f"? DB Connection Error: {e}")
             return None
     return g.db
 
@@ -42,7 +42,7 @@ TIME_SLOTS = [
 def init_db():
     conn = get_db()
     if not conn:
-        print("❌ Hindi makakonekta sa database!")
+        print("? Hindi makakonekta sa database!")
         return
     cur = conn.cursor()
     
@@ -72,6 +72,10 @@ def init_db():
         );
     """)
     cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rejection_reason TEXT")
+    # NEW: para sa reschedule (reason ng nurse + dating schedule)
+    cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reschedule_reason TEXT")
+    cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS old_date TEXT")
+    cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS old_time TEXT")
     
     cur.execute("SELECT id FROM users WHERE email = %s", ("nurse@school.ph",))
     nurse = cur.fetchone()
@@ -84,7 +88,7 @@ def init_db():
     conn.commit()
     cur.close()
     conn.close()
-    print("✅ Database ready!")
+    print("? Database ready!")
 
 # === AUTH HELPERS ===
 def current_user():
@@ -146,7 +150,7 @@ def index():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏫 School Clinic - Appointment System</title>
+    <title>?? School Clinic - Appointment System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <style>
@@ -212,6 +216,7 @@ def index():
         .status-pending { background: #fef08a; color: #854d0e; }
         .status-approved { background: #bbf7d0; color: #166534; }
         .status-rejected { background: #fecaca; color: #991b1b; }
+        .status-rescheduled { background: #bfdbfe; color: #1e40af; }
         .history-panel {
             max-height: 550px;
             overflow-y: auto;
@@ -257,7 +262,7 @@ def index():
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-<!-- 🔐 LOGIN PAGE -->
+<!-- ?? LOGIN PAGE -->
 <div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4">
     <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
         <!-- Logo + Title - Nakasentro at Walang Background -->
@@ -319,9 +324,9 @@ def index():
                 <div>
                     <label class="block text-gray-700 font-medium mb-1">You are a...</label>
                     <select id="regRole" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                        <option value="Student"> 🎓 Student</option>
-                        <option value="Teacher"> 📖 Teacher</option>
-                        <option value="Staff"> 🏛️ Staff</option>
+                        <option value="Student"> ?? Student</option>
+                        <option value="Teacher"> ?? Teacher</option>
+                        <option value="Staff"> ??? Staff</option>
                     </select>
                 </div>
                 <button onclick="registerUser()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold">
@@ -332,12 +337,12 @@ def index():
         <p id="authMsg" class="mt-4 text-center font-medium"></p>
     </div>
 </div>
-<!-- 🏠 USER DASHBOARD -->
+<!-- ?? USER DASHBOARD -->
 <div id="userDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
     <!-- Mobile Menu Button -->
     <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
         <span class="font-bold">Clinic</span>
-        <button id="userMenuBtn" class="text-xl">☰</button>
+        <button id="userMenuBtn" class="text-xl">?</button>
     </div>
     <!-- Sidebar -->
     <aside id="userSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
@@ -372,7 +377,7 @@ def index():
             </button>
         </div>
         <div class="dashboard-card p-6 mb-6 fade-in">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">📅 Book an Appointment</h3>
+            <h3 class="text-lg font-bold text-gray-800 mb-4">?? Book an Appointment</h3>
             <div class="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-gray-600 text-sm font-medium mb-1">Select Date (Monday–Friday only)</label>
@@ -407,7 +412,7 @@ def index():
             </button>
         </div>
         <div class="dashboard-card p-6 fade-in">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">📋 My Appointments</h3>
+            <h3 class="text-lg font-bold text-gray-800 mb-4">?? My Appointments</h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
@@ -418,7 +423,7 @@ def index():
                             <th class="py-2 px-2">Type</th>
                             <th class="py-2 px-2">Purpose</th>
                             <th class="py-2 px-2">Status</th>
-                            <th class="py-2 px-2">Rejection Reason</th>
+                            <th class="py-2 px-2">Rejection / Reschedule Reason</th>
                         </tr>
                     </thead>
                     <tbody id="myAppointmentsTable">
@@ -429,7 +434,7 @@ def index():
         </div>
     </main>
 </div>
-<!-- 👩‍⚕️ NURSE DASHBOARD -->
+<!-- ????? NURSE DASHBOARD -->
 <div id="nurseDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
     <!-- Mobile Menu Button -->
     <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
@@ -437,7 +442,7 @@ def index():
             <span class="font-bold">NURSE PANEL</span>
             <p class="text-xs text-blue-200">Clinic Management</p>
         </div>
-        <button id="nurseMenuBtn" class="text-xl">☰</button>
+        <button id="nurseMenuBtn" class="text-xl">?</button>
     </div>
     <!-- Sidebar -->
     <aside id="nurseSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
@@ -517,7 +522,7 @@ def index():
                 </div>
             </div>
             <div class="dashboard-card p-4 mb-6">
-    <h3 class="text-lg font-bold text-gray-800 mb-3">🔍 Search Patient History</h3>
+    <h3 class="text-lg font-bold text-gray-800 mb-3">?? Search Patient History</h3>
     
     <!-- Search Bar - Responsive -->
     <div class="flex flex-col sm:flex-row gap-3 mb-4">
@@ -530,7 +535,7 @@ def index():
     </div>
 
                 <div id="patientHistoryResult" class="mt-4 hidden">
-                    <h4 class="font-bold text-gray-700 mb-2">📋 Appointment History:</h4>
+                    <h4 class="font-bold text-gray-700 mb-2">?? Appointment History:</h4>
                     <div class="history-panel overflow-x-auto border rounded-lg">
                         <table class="w-full min-w-max text-sm">
                             <thead class="bg-gray-100">
@@ -568,7 +573,7 @@ def index():
             </div>
         </div>
 
-        <!-- ✅ Pinakaayos na Scrollable Table Container -->
+        <!-- ? Pinakaayos na Scrollable Table Container -->
         <div class="w-full overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
             <table class="w-full text-sm min-w-max">
                 <thead class="bg-gray-50">
@@ -581,11 +586,12 @@ def index():
                         <th class="py-3 px-3 font-semibold whitespace-nowrap">Visit Type</th>
                         <th class="py-3 px-3 font-semibold whitespace-nowrap">Purpose</th>
                         <th class="py-3 px-3 font-semibold text-center whitespace-nowrap">Status</th>
+                        <th class="py-3 px-3 font-semibold text-center whitespace-nowrap">Action</th>
                     </tr>
                 </thead>
                 <tbody id="historyTable">
                     <tr>
-                        <td colspan="8" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td>
+                        <td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td>
                     </tr>
                 </tbody>
             </table>
@@ -596,7 +602,7 @@ def index():
         <div id="nurseViewAppointments" class="hidden fade-in">
             <div class="dashboard-card p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
-                    <h3 class="text-lg font-bold text-gray-800">📋 ALL Clinic Appointments</h3>
+                    <h3 class="text-lg font-bold text-gray-800">?? ALL Clinic Appointments</h3>
                     <div class="flex gap-2">
                         <select id="filterRole" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm">
                             <option value="all">All Roles</option>
@@ -606,9 +612,9 @@ def index():
                         </select>
                         <select id="filterStatus" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm">
                             <option value="all">All Status</option>
-                            <option value="pending">⏳ Pending</option>
-                            <option value="approved">✅ Approved</option>
-                            <option value="rejected">❌ Rejected</option>
+                            <option value="pending">? Pending</option>
+                            <option value="approved">? Approved</option>
+                            <option value="rejected">? Rejected</option>
                         </select>
                     </div>
                 </div>
@@ -636,7 +642,40 @@ def index():
         </div>
     </main>
 </div>
-<!-- ⚡ JAVASCRIPT: Sidebar Toggle -->
+
+<!-- RESCHEDULE MODAL (NURSE) -->
+<div id="rescheduleModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <h3 class="text-lg font-bold text-gray-800 mb-1">
+            <i class="fa-solid fa-calendar-days text-blue-600 mr-2"></i> Reschedule Appointment
+        </h3>
+        <p class="text-sm text-gray-500 mb-4" id="rsInfo"></p>
+        <div class="space-y-3">
+            <div>
+                <label class="block text-gray-600 text-sm font-medium mb-1">Reason for rescheduling <span class="text-red-500">*</span></label>
+                <textarea id="rsReason" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ilagay ang dahilan kung bakit nire-reschedule..."></textarea>
+            </div>
+            <div>
+                <label class="block text-gray-600 text-sm font-medium mb-1">New Date (Monday–Friday only) <span class="text-red-500">*</span></label>
+                <input type="date" id="rsDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="loadRescheduleSlots()">
+            </div>
+            <div>
+                <label class="block text-gray-600 text-sm font-medium mb-1">New Time <span class="text-red-500">*</span></label>
+                <select id="rsTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Select a date first...</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+            <button onclick="closeRescheduleModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Cancel</button>
+            <button id="rsSubmitBtn" onclick="submitReschedule()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">
+                <i class="fa-solid fa-calendar-check mr-1"></i> Confirm Reschedule
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ? JAVASCRIPT: Sidebar Toggle -->
 <script>
 // ===== USER SIDEBAR =====
 function toggleUserSidebar() {
@@ -677,7 +716,9 @@ function togglePassword(inputId, eyeId) {
 let currentUser = null;
 let selectedTimeSlot = null;
 let isSubmittingAppointment = false;
-// ✅ AVAILABLE TIME SLOTS (Fixed schedule)
+let aptCache = {};
+let rescheduleId = null;
+// ? AVAILABLE TIME SLOTS (Fixed schedule)
 const ALL_TIME_SLOTS = [
     '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
     '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
@@ -691,12 +732,28 @@ async function api(url, options = {}) {
     if (!response.ok) throw new Error(data.error || 'Something went wrong.');
     return data;
 }
+
+// === HELPERS (escape, status label) ===
+function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function statusInfo(a) {
+    if (a.status === 'approved' && a.rescheduleReason) {
+        return { cls: 'status-rescheduled', text: 'Rescheduled' };
+    }
+    const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
+    const txt = { pending: '? Pending', approved: '? Approved', rejected: '? Rejected' };
+    return { cls: cls[a.status], text: txt[a.status] };
+}
+
 // === PREVENT WEEKEND DATES ===
 function setDateRestrictions() {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('aptDate').min = today;
 }
-// === ✅ LOAD AVAILABLE TIME SLOTS BASED ON SELECTED DATE ===
+// === ? LOAD AVAILABLE TIME SLOTS BASED ON SELECTED DATE ===
 async function loadAvailableTimeSlots() {
     const dateInput = document.getElementById('aptDate');
     const selectedDate = dateInput.value;
@@ -711,7 +768,7 @@ async function loadAvailableTimeSlots() {
     const dateObj = new Date(selectedDate + 'T00:00:00');
     const dayOfWeek = dateObj.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
-        container.innerHTML = '<span class="text-red-500 text-sm col-span-3">⚠️ Appointments are Monday–Friday only.</span>';
+        container.innerHTML = '<span class="text-red-500 text-sm col-span-3">?? Appointments are Monday–Friday only.</span>';
         document.getElementById('aptTime').value = '';
         selectedTimeSlot = null;
         return;
@@ -733,7 +790,7 @@ async function loadAvailableTimeSlots() {
         }
     }).join('');
 }
-// === ✅ SELECT TIME SLOT ===
+// === ? SELECT TIME SLOT ===
 function selectTimeSlot(time, clickEvent) {
     selectedTimeSlot = time;
     document.getElementById('aptTime').value = time;
@@ -771,17 +828,17 @@ async function registerUser() {
     const role = document.getElementById('regRole').value;
     const msg = document.getElementById('authMsg');
     if (!name || !email || !pass) {
-        msg.textContent = '⚠️ Please fill in all fields!'; msg.className = 'text-orange-500'; return;
+        msg.textContent = '?? Please fill in all fields!'; msg.className = 'text-orange-500'; return;
     }
     if (pass.length < 6) {
-        msg.textContent = '⚠️ Password must be at least 6 characters!'; msg.className = 'text-orange-500'; return;
+        msg.textContent = '?? Password must be at least 6 characters!'; msg.className = 'text-orange-500'; return;
     }
     try {
         await api('/api/register', { method: 'POST', body: JSON.stringify({ name, email, password: pass, role }) });
-        msg.textContent = '✅ Account created! Please sign in.'; msg.className = 'text-green-500';
+        msg.textContent = '? Account created! Please sign in.'; msg.className = 'text-green-500';
         setTimeout(() => showAuthTab('login'), 1500);
     } catch (error) {
-        msg.textContent = `❌ ${error.message}`; msg.className = 'text-red-500';
+        msg.textContent = `? ${error.message}`; msg.className = 'text-red-500';
     }
 }
 // === LOGIN USER ===
@@ -791,7 +848,7 @@ async function loginUser() {
     const msg = document.getElementById('authMsg');
     const loginButton = document.getElementById('loginButton');
     if (!email || !pass) {
-        msg.textContent = '⚠️ Enter your email and password.';
+        msg.textContent = '?? Enter your email and password.';
         msg.className = 'text-orange-500';
         return;
     }
@@ -803,8 +860,8 @@ async function loginUser() {
         openDashboard();
     } catch (error) {
         const message = error.message === 'Failed to fetch'
-            ? '❌ Cannot connect to the clinic server. Run "py app.py" and open http://127.0.0.1:5050.'
-            : `❌ ${error.message}`;
+            ? '? Cannot connect to the clinic server. Run "py app.py" and open http://127.0.0.1:5050.'
+            : `? ${error.message}`;
         msg.textContent = message;
         msg.className = 'text-red-500';
     } finally {
@@ -843,13 +900,13 @@ function openDashboard() {
     } else {
         document.getElementById('userDashboard').classList.remove('hidden');
         document.getElementById('displayName').textContent = currentUser.name;
-        const labels = { Student: '🎓 Student', Teacher: '📖 Teacher', Staff: '🏛️ Staff' };
+        const labels = { Student: '?? Student', Teacher: '?? Teacher', Staff: '??? Staff' };
         document.getElementById('displayRole').textContent = labels[currentUser.role];
         renderMyAppointments();
         setDateRestrictions();
     }
 }
-// === ✅ SUBMIT APPOINTMENT WITH TIME SLOT VALIDATION ===
+// === ? SUBMIT APPOINTMENT WITH TIME SLOT VALIDATION ===
 async function submitAppointment() {
     if (isSubmittingAppointment) return;
     const date = document.getElementById('aptDate').value;
@@ -857,7 +914,7 @@ async function submitAppointment() {
     const type = document.getElementById('aptType').value;
     const reason = document.getElementById('aptReason').value.trim();
     if (!date || !time || !reason) { 
-        alert('⚠️ Please select a date, available time slot, and fill in purpose!'); 
+        alert('?? Please select a date, available time slot, and fill in purpose!'); 
         return; 
     }
     const submitButton = document.getElementById('submitAppointmentButton');
@@ -868,9 +925,9 @@ async function submitAppointment() {
         await api('/api/appointments', {
             method: 'POST', body: JSON.stringify({ date, time, type, reason })
         });
-        alert('✅ Appointment submitted!');
+        alert('? Appointment submitted!');
     } catch (error) {
-        alert(`❌ ${error.message}`);
+        alert(`? ${error.message}`);
         loadAvailableTimeSlots();
         return;
     } finally {
@@ -899,18 +956,26 @@ async function renderMyAppointments() {
         tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-gray-400 italic">No appointments yet.</td></tr>';
         return;
     }
-    const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
-    const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
-    tbody.innerHTML = apts.map((a, i) => `
+    tbody.innerHTML = apts.map((a, i) => {
+        const st = statusInfo(a);
+        let remarks = '—';
+        if (a.status === 'rejected') {
+            remarks = esc(a.rejectionReason || 'No reason provided.');
+        } else if (a.rescheduleReason) {
+            remarks = '<b>Rescheduled by nurse:</b> ' + esc(a.rescheduleReason) +
+                (a.oldDate ? '<br><span class="text-xs text-gray-500">Previous schedule: ' + esc(a.oldDate) + ' ' + esc(a.oldTime) + '</span>' : '');
+        }
+        return `
         <tr class="border-b hover:bg-blue-50">
             <td class="py-2 px-2">${i+1}</td>
             <td class="py-2 px-2">${a.date}</td>
             <td class="py-2 px-2">${a.time}</td>
             <td class="py-2 px-2">${a.type}</td>
             <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
-            <td class="py-2 px-2"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span></td>
-            <td class="py-2 px-2 max-w-xs">${a.status === 'rejected' ? (a.rejectionReason || 'No reason provided.') : '—'}</td>
-        </tr>`).join('');
+            <td class="py-2 px-2"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}">${st.text}</span></td>
+            <td class="py-2 px-2 max-w-xs">${remarks}</td>
+        </tr>`;
+    }).join('');
 }
 // === UPDATE STATISTICS ===
 async function updateStats() {
@@ -934,6 +999,7 @@ async function renderAllAppointments() {
     try {
         const data = await api('/api/appointments/all');
         let apts = data.appointments;
+        apts.forEach(a => { aptCache[a.id] = a; });
 
         // Apply role filter
         if (filterRole !== 'all') {
@@ -950,10 +1016,9 @@ async function renderAllAppointments() {
             return;
         }
 
-        const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
-        const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
-
-        tbody.innerHTML = apts.map((a, i) => `
+        tbody.innerHTML = apts.map((a, i) => {
+            const st = statusInfo(a);
+            return `
             <tr class="border-b hover:bg-blue-50">
                 <td class="py-2 px-2 text-center">${i + 1}</td>
                 <td class="py-2 px-2">${a.userName}</td>
@@ -963,60 +1028,179 @@ async function renderAllAppointments() {
                 <td class="py-2 px-2">${a.type}</td>
                 <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
                 <td class="py-2 px-2 text-center">
-                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}">${st.text}</span>
                 </td>
-                <td class="py-2 px-2 text-center">
+                <td class="py-2 px-2 text-center whitespace-nowrap">
                     ${a.status === 'pending' ? `
                         <button onclick="approveAppointment(${a.id})" class="text-green-600 hover:text-green-800 mr-2" title="Approve">
                             <i class="fa-solid fa-check"></i>
                         </button>
-                        <button onclick="rejectAppointment(${a.id})" class="text-red-600 hover:text-red-800" title="Reject">
-                            <i class="fa-solid fa-xmark"></i>
+                        <button onclick="openRescheduleModal(${a.id})" class="text-blue-600 hover:text-blue-800 mr-2" title="Reschedule">
+                            <i class="fa-solid fa-calendar-days"></i>
                         </button>
                     ` : ''}
+                    <button onclick="printAppointment(${a.id})" class="text-gray-600 hover:text-gray-800 mr-2" title="Print">
+                        <i class="fa-solid fa-print"></i>
+                    </button>
+                    <button onclick="deleteAppointment(${a.id})" class="text-red-600 hover:text-red-800" title="Delete">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
                 </td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
     } catch (error) {
         document.getElementById('allAppointmentsTable').innerHTML = 
-            `<tr><td colspan="9" class="py-8 text-center text-red-500">❌ ${error.message}</td></tr>`;
+            `<tr><td colspan="9" class="py-8 text-center text-red-500">? ${error.message}</td></tr>`;
     }
 }
 
 // === APPROVE APPOINTMENT ===
 async function approveAppointment(id) {
-    if (!confirm('✅ Approve this appointment?')) return;
+    if (!confirm('? Approve this appointment?')) return;
     try {
         await api(`/api/appointments/${id}/approve`, { method: 'POST' });
-        alert('✅ Appointment approved!');
+        alert('? Appointment approved!');
         updateStats();
         renderAllAppointments();
         renderHistory(false);
     } catch (error) {
-        alert(`❌ ${error.message}`);
+        alert(`? ${error.message}`);
     }
 }
 
-// === REJECT APPOINTMENT ===
-async function rejectAppointment(id) {
-    const rejectionReason = window.prompt('Enter the reason for rejecting this appointment:');
-    if (rejectionReason === null) return;
-    if (!rejectionReason.trim()) {
-        alert('⚠️ A rejection reason is required.');
+// === RESCHEDULE APPOINTMENT (REPLACES REJECT) ===
+function openRescheduleModal(id) {
+    const a = aptCache[id];
+    if (!a) return;
+    rescheduleId = id;
+    document.getElementById('rsInfo').textContent =
+        a.userName + ' — current: ' + a.date + ' ' + a.time;
+    document.getElementById('rsReason').value = '';
+    document.getElementById('rsDate').value = '';
+    document.getElementById('rsDate').min = new Date().toISOString().split('T')[0];
+    document.getElementById('rsTime').innerHTML = '<option value="">Select a date first...</option>';
+    document.getElementById('rescheduleModal').classList.remove('hidden');
+}
+function closeRescheduleModal() {
+    document.getElementById('rescheduleModal').classList.add('hidden');
+    rescheduleId = null;
+}
+async function loadRescheduleSlots() {
+    const selectedDate = document.getElementById('rsDate').value;
+    const select = document.getElementById('rsTime');
+    if (!selectedDate) {
+        select.innerHTML = '<option value="">Select a date first...</option>';
         return;
     }
-    if (!confirm('❌ Reject this appointment?')) return;
+    const day = new Date(selectedDate + 'T00:00:00').getDay();
+    if (day === 0 || day === 6) {
+        select.innerHTML = '<option value="">Monday–Friday only</option>';
+        return;
+    }
     try {
-        await api(`/api/appointments/${id}/reject`, {
+        const data = await api(`/api/appointments/slots?date=${encodeURIComponent(selectedDate)}`);
+        const free = ALL_TIME_SLOTS.filter(t => !data.taken.includes(t));
+        if (free.length === 0) {
+            select.innerHTML = '<option value="">No available slots on this date</option>';
+            return;
+        }
+        select.innerHTML = '<option value="">Select time...</option>' +
+            free.map(t => `<option value="${t}">${t}</option>`).join('');
+    } catch (error) {
+        select.innerHTML = `<option value="">${esc(error.message)}</option>`;
+    }
+}
+async function submitReschedule() {
+    const reason = document.getElementById('rsReason').value.trim();
+    const newDate = document.getElementById('rsDate').value;
+    const newTime = document.getElementById('rsTime').value;
+    if (!reason) { alert('?? Please enter the reason for rescheduling first.'); return; }
+    if (!newDate || !newTime) { alert('?? Please select the new date and time.'); return; }
+    const btn = document.getElementById('rsSubmitBtn');
+    btn.disabled = true;
+    btn.classList.add('opacity-60', 'cursor-not-allowed');
+    try {
+        await api(`/api/appointments/${rescheduleId}/reschedule`, {
             method: 'POST',
-            body: JSON.stringify({ rejectionReason: rejectionReason.trim() })
+            body: JSON.stringify({ date: newDate, time: newTime, reason })
         });
-        alert('❌ Appointment rejected.');
+        alert('? Appointment rescheduled.');
+        closeRescheduleModal();
         updateStats();
         renderAllAppointments();
         renderHistory(false);
     } catch (error) {
-        alert(`❌ ${error.message}`);
+        alert(`? ${error.message}`);
+        loadRescheduleSlots();
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-60', 'cursor-not-allowed');
     }
+}
+
+// === DELETE APPOINTMENT ===
+async function deleteAppointment(id) {
+    if (!confirm('?? Delete this appointment permanently? This cannot be undone.')) return;
+    try {
+        await api(`/api/appointments/${id}`, { method: 'DELETE' });
+        delete aptCache[id];
+        alert('? Appointment deleted.');
+        updateStats();
+        renderAllAppointments();
+        renderHistory(false);
+    } catch (error) {
+        alert(`? ${error.message}`);
+    }
+}
+
+// === PRINT APPOINTMENT DETAILS ===
+function printAppointment(id) {
+    const a = aptCache[id];
+    if (!a) { alert('? Appointment details not found.'); return; }
+    const st = statusInfo(a);
+    const rows = [
+        ['Patient Name', a.userName],
+        ['Role', a.userRole],
+        ['Date', a.date],
+        ['Time', a.time],
+        ['Visit Type', a.type],
+        ['Purpose / Symptoms', a.reason],
+        ['Status', st.text.replace('? ', '')]
+    ];
+    if (a.rescheduleReason) {
+        rows.push(['Reschedule Reason', a.rescheduleReason]);
+        if (a.oldDate) rows.push(['Previous Schedule', a.oldDate + ' ' + a.oldTime]);
+    }
+    if (a.status === 'rejected' && a.rejectionReason) {
+        rows.push(['Rejection Reason', a.rejectionReason]);
+    }
+    const body = rows.map(r =>
+        '<tr><th>' + esc(r[0]) + '</th><td>' + esc(r[1]) + '</td></tr>'
+    ).join('');
+    const w = window.open('', '_blank', 'width=800,height=700');
+    if (!w) { alert('?? Please allow pop-ups to print.'); return; }
+    w.document.write(
+        '<html><head><title>Appointment #' + a.id + '</title>' +
+        '<style>' +
+        'body{font-family:Arial,sans-serif;padding:40px;color:#111;}' +
+        'h1{text-align:center;margin-bottom:4px;}' +
+        'p.sub{text-align:center;color:#555;margin-top:0;margin-bottom:30px;}' +
+        'table{width:100%;border-collapse:collapse;}' +
+        'th,td{border:1px solid #999;padding:10px;text-align:left;vertical-align:top;}' +
+        'th{background:#f1f5f9;width:35%;}' +
+        '.foot{margin-top:50px;display:flex;justify-content:space-between;}' +
+        '.sig{border-top:1px solid #000;width:220px;text-align:center;padding-top:4px;font-size:13px;}' +
+        '</style></head><body>' +
+        '<h1>School Clinic</h1>' +
+        '<p class="sub">Appointment Details &mdash; Ref #' + a.id + '</p>' +
+        '<table>' + body + '</table>' +
+        '<div class="foot"><div class="sig">Patient Signature</div><div class="sig">School Nurse</div></div>' +
+        '<p style="margin-top:30px;font-size:12px;color:#777;">Printed: ' + esc(new Date().toLocaleString()) + '</p>' +
+        '</body></html>'
+    );
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); }, 300);
 }
 
 // === RENDER APPOINTMENT HISTORY ===
@@ -1024,6 +1208,7 @@ async function renderHistory(oldestFirst = false) {
     try {
         const data = await api('/api/appointments/all');
         let apts = data.appointments;
+        apts.forEach(a => { aptCache[a.id] = a; });
 
         // Sort by date/time
         apts.sort((a, b) => {
@@ -1034,14 +1219,13 @@ async function renderHistory(oldestFirst = false) {
 
         const tbody = document.getElementById('historyTable');
         if (apts.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td></tr>';
             return;
         }
 
-        const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
-        const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
-
-        tbody.innerHTML = apts.map((a, i) => `
+        tbody.innerHTML = apts.map((a, i) => {
+            const st = statusInfo(a);
+            return `
             <tr class="border-b hover:bg-blue-50">
                 <td class="py-2 px-2 text-center">${i + 1}</td>
                 <td class="py-2 px-2">${a.userName}</td>
@@ -1051,12 +1235,21 @@ async function renderHistory(oldestFirst = false) {
                 <td class="py-2 px-2">${a.type}</td>
                 <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
                 <td class="py-2 px-2 text-center">
-                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}">${st.text}</span>
                 </td>
-            </tr>`).join('');
+                <td class="py-2 px-2 text-center whitespace-nowrap">
+                    <button onclick="printAppointment(${a.id})" class="text-gray-600 hover:text-gray-800 mr-2" title="Print">
+                        <i class="fa-solid fa-print"></i>
+                    </button>
+                    <button onclick="deleteAppointment(${a.id})" class="text-red-600 hover:text-red-800" title="Delete">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
     } catch (error) {
         document.getElementById('historyTable').innerHTML = 
-            `<tr><td colspan="8" class="py-8 text-center text-red-500">❌ ${error.message}</td></tr>`;
+            `<tr><td colspan="9" class="py-8 text-center text-red-500">? ${error.message}</td></tr>`;
     }
 }
 
@@ -1067,7 +1260,7 @@ async function searchPatientHistory() {
     const tableBody = document.getElementById('patientHistoryTable');
 
     if (!name) {
-        alert('⚠️ Please enter a name to search.');
+        alert('?? Please enter a name to search.');
         return;
     }
 
@@ -1084,10 +1277,9 @@ async function searchPatientHistory() {
             return;
         }
 
-        const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
-        const txt = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
-
-        tableBody.innerHTML = matches.map((a, i) => `
+        tableBody.innerHTML = matches.map((a, i) => {
+            const st = statusInfo(a);
+            return `
             <tr class="border-b hover:bg-blue-50">
                 <td class="py-2 px-2">${i + 1}</td>
                 <td class="py-2 px-2">${a.date}</td>
@@ -1095,12 +1287,13 @@ async function searchPatientHistory() {
                 <td class="py-2 px-2">${a.type}</td>
                 <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
                 <td class="py-2 px-2">
-                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls[a.status]}">${txt[a.status]}</span>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}">${st.text}</span>
                 </td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
     } catch (error) {
         resultDiv.classList.remove('hidden');
-        tableBody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">❌ ${error.message}</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">? ${error.message}</td></tr>`;
     }
 }
 
@@ -1272,7 +1465,8 @@ def get_my_appointments():
     try:
         cur = conn.cursor()
         cur.execute("""
-            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status, a.rejection_reason
+            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status, a.rejection_reason,
+                   a.reschedule_reason, a.old_date, a.old_time
             FROM appointments a
             JOIN users u ON a.user_id = u.id
             WHERE a.user_id = %s
@@ -1288,7 +1482,10 @@ def get_my_appointments():
                 "type": row[5],
                 "reason": row[6],
                 "status": row[7],
-                "rejectionReason": row[8]
+                "rejectionReason": row[8],
+                "rescheduleReason": row[9],
+                "oldDate": row[10],
+                "oldTime": row[11]
             }
             for row in cur.fetchall()
         ]
@@ -1309,7 +1506,8 @@ def get_all_appointments():
     try:
         cur = conn.cursor()
         cur.execute("""
-            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status, a.rejection_reason
+            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status, a.rejection_reason,
+                   a.reschedule_reason, a.old_date, a.old_time
             FROM appointments a
             JOIN users u ON a.user_id = u.id
             ORDER BY a.created_at DESC
@@ -1324,7 +1522,10 @@ def get_all_appointments():
                 "type": row[5],
                 "reason": row[6],
                 "status": row[7],
-                "rejectionReason": row[8]
+                "rejectionReason": row[8],
+                "rescheduleReason": row[9],
+                "oldDate": row[10],
+                "oldTime": row[11]
             }
             for row in cur.fetchall()
         ]
@@ -1378,6 +1579,81 @@ def reject(apt_id):
             return jsonify(error="Appointment not found."), 404
         conn.commit()
         return jsonify(message="Appointment rejected."), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+        conn.close()
+
+# === NEW: RESCHEDULE (nurse sets new date/time + required reason) ===
+@app.post("/api/appointments/<int:apt_id>/reschedule")
+@nurse_required
+def reschedule(apt_id):
+    data = request.get_json(silent=True) or {}
+    new_date = (data.get("date") or "").strip()
+    new_time = (data.get("time") or "").strip()
+    reason = (data.get("reason") or "").strip()
+
+    if not reason:
+        return jsonify(error="A reschedule reason is required."), 400
+    if not new_date or not new_time:
+        return jsonify(error="New date and time are required."), 400
+    try:
+        parsed = datetime.strptime(new_date, "%Y-%m-%d")
+    except ValueError:
+        return jsonify(error="Invalid date format."), 400
+    if parsed.weekday() >= 5:
+        return jsonify(error="Appointments are Monday–Friday only."), 400
+    if new_time not in TIME_SLOTS:
+        return jsonify(error="Invalid time slot."), 400
+
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT date, time FROM appointments WHERE id = %s", (apt_id,))
+        current = cur.fetchone()
+        if current is None:
+            return jsonify(error="Appointment not found."), 404
+
+        cur.execute("""
+            UPDATE appointments
+            SET old_date = %s, old_time = %s,
+                date = %s, time = %s,
+                reschedule_reason = %s,
+                rejection_reason = NULL,
+                status = 'approved'
+            WHERE id = %s
+        """, (current[0], current[1], new_date, new_time, reason, apt_id))
+        conn.commit()
+        return jsonify(message="Appointment rescheduled."), 200
+    except Exception as e:
+        conn.rollback()
+        if "unique constraint" in str(e).lower():
+            return jsonify(error="That time slot has already been booked."), 409
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+        conn.close()
+
+# === NEW: DELETE APPOINTMENT (nurse only) ===
+@app.delete("/api/appointments/<int:apt_id>")
+@nurse_required
+def delete_appointment(apt_id):
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM appointments WHERE id = %s", (apt_id,))
+        if cur.rowcount == 0:
+            return jsonify(error="Appointment not found."), 404
+        conn.commit()
+        return jsonify(message="Appointment deleted."), 200
     except Exception as e:
         conn.rollback()
         return jsonify(error=str(e)), 500

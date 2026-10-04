@@ -5,7 +5,6 @@ from pathlib import Path
 import psycopg2  # ? Ginamit ang tamang package
 from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
-
 # === DATABASE CONFIGURATION ===
 DATABASE_URL = os.environ.get("DATABASE_URL")
 BASE_DIR = Path(__file__).resolve().parent
@@ -15,7 +14,6 @@ app.config["SECRET_KEY"] = os.environ.get(
 )
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-
 # ? IISA LANG NG GET_DB FUNCTION — PARA SA POSTGRESQL
 def get_db():
     if "db" not in g:
@@ -26,18 +24,15 @@ def get_db():
             print(f"? DB Connection Error: {e}")
             return None
     return g.db
-
 @app.teardown_appcontext
 def close_db(_error):
     db = g.pop("db", None)
     if db is not None:
         db.close()
-
 TIME_SLOTS = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
 ]
-
 # === DATABASE INITIALIZATION — POSTGRESQL SYNTAX ===
 def init_db():
     conn = get_db()
@@ -89,7 +84,6 @@ def init_db():
     cur.close()
     conn.close()
     print("? Database ready!")
-
 # === AUTH HELPERS ===
 def current_user():
     user_id = session.get("user_id")
@@ -105,7 +99,6 @@ def current_user():
     if not user:
         return None
     return {"id": user[0], "name": user[1], "email": user[2], "role": user[3]}
-
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -115,7 +108,6 @@ def login_required(view):
         g.user = user
         return view(*args, **kwargs)
     return wrapped
-
 def nurse_required(view):
     @wraps(view)
     @login_required
@@ -124,10 +116,8 @@ def nurse_required(view):
             return jsonify(error="Nurse access required."), 403
         return view(*args, **kwargs)
     return wrapped
-
 def user_dict(user):
     return {"id": user["id"], "name": user["name"], "email": user["email"], "role": user["role"]}
-
 def appointment_dict(row):
     return {
         "id": row[0],
@@ -140,7 +130,6 @@ def appointment_dict(row):
         "reason": row[7],
         "status": row[8],
     }
-
 # === HTML CONTENT (HINDI BINAGO) ===
 @app.get("/")
 def index():
@@ -275,7 +264,6 @@ def index():
             <h1 class="text-2xl font-bold text-gray-800">Clinic Appointment System</h1>
             <p class="text-gray-500">School Clinic Appointment System</p>
         </div>
-
         <div class="flex mb-6 border-b border-gray-200">
             <button id="tabLogin" class="flex-1 py-3 text-center tab-active" onclick="showAuthTab('login')">
                 <i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In
@@ -289,7 +277,7 @@ def index():
             <div class="space-y-4">
                 <div>
                     <label class="block text-gray-700 font-medium mb-1">Email</label>
-                    <input type="email" id="loginEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your@email.com">
+                    <input type="email" id="loginEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your@gmail.com">
                 </div>
                 <div>
                     <label class="block text-gray-700 font-medium mb-1">Password</label>
@@ -312,7 +300,7 @@ def index():
                 </div>
                 <div>
                     <label class="block text-gray-700 font-medium mb-1">Email</label>
-                    <input type="email" id="regEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="your@email.com">
+                    <input type="email" id="regEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="your@gmail.com">
                 </div>
                 <div>
                     <label class="block text-gray-700 font-medium mb-1">Password</label>
@@ -498,8 +486,14 @@ def index():
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div class="stat-card bg-blue-500 text-white p-4">
                     <div class="flex items-center justify-between">
-                        <div><p class="text-blue-100 text-sm">New Requests</p><p class="text-3xl font-bold" id="statNew">0</p></div>
-                        <i class="fa-solid fa-calendar-plus text-3xl text-blue-200"></i>
+                        <div><p class="text-blue-100 text-sm">All Patients</p><p class="text-3xl font-bold" id="statTotal">0</p></div>
+                        <i class="fa-solid fa-users text-3xl text-blue-200"></i>
+                    </div>
+                </div>
+                <div class="stat-card bg-cyan-500 text-white p-4">
+                    <div class="flex items-center justify-between">
+                        <div><p class="text-cyan-100 text-sm">New Requests</p><p class="text-3xl font-bold" id="statNew">0</p></div>
+                        <i class="fa-solid fa-calendar-plus text-3xl text-cyan-200"></i>
                     </div>
                 </div>
                 <div class="stat-card bg-yellow-500 text-white p-4">
@@ -512,12 +506,6 @@ def index():
                     <div class="flex items-center justify-between">
                         <div><p class="text-green-100 text-sm">Approved</p><p class="text-3xl font-bold" id="statApproved">0</p></div>
                         <i class="fa-solid fa-check-circle text-3xl text-green-200"></i>
-                    </div>
-                </div>
-                <div class="stat-card bg-red-500 text-white p-4">
-                    <div class="flex items-center justify-between">
-                        <div><p class="text-red-100 text-sm">Rejected</p><p class="text-3xl font-bold" id="statRejected">0</p></div>
-                        <i class="fa-solid fa-times-circle text-3xl text-red-200"></i>
                     </div>
                 </div>
             </div>
@@ -533,7 +521,6 @@ def index():
             <i class="fa-solid fa-magnifying-glass mr-2"></i> Search
         </button>
     </div>
-
                 <div id="patientHistoryResult" class="mt-4 hidden">
                     <h4 class="font-bold text-gray-700 mb-2"> Appointment History:</h4>
                     <div class="history-panel overflow-x-auto border rounded-lg">
@@ -572,7 +559,6 @@ def index():
                 </button>
             </div>
         </div>
-
         <!-- ? Pinakaayos na Scrollable Table Container -->
         <div class="w-full overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
             <table class="w-full text-sm min-w-max">
@@ -612,9 +598,9 @@ def index():
                         </select>
                         <select id="filterStatus" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm">
                             <option value="all">All Status</option>
-                            <option value="pending">? Pending</option>
-                            <option value="approved">? Approved</option>
-                            <option value="rejected">? Rejected</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
                         </select>
                     </div>
                 </div>
@@ -642,7 +628,6 @@ def index():
         </div>
     </main>
 </div>
-
 <!-- RESCHEDULE MODAL (NURSE) -->
 <div id="rescheduleModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
@@ -674,7 +659,6 @@ def index():
         </div>
     </div>
 </div>
-
 <!-- ? JAVASCRIPT: Sidebar Toggle -->
 <script>
 // ===== USER SIDEBAR =====
@@ -732,7 +716,6 @@ async function api(url, options = {}) {
     if (!response.ok) throw new Error(data.error || 'Something went wrong.');
     return data;
 }
-
 // === HELPERS (escape, status label) ===
 function esc(s) {
     return String(s === null || s === undefined ? '' : s)
@@ -744,10 +727,9 @@ function statusInfo(a) {
         return { cls: 'status-rescheduled', text: 'Rescheduled' };
     }
     const cls = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected' };
-    const txt = { pending: '? Pending', approved: '? Approved', rejected: '? Rejected' };
+    const txt = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
     return { cls: cls[a.status], text: txt[a.status] };
 }
-
 // === PREVENT WEEKEND DATES ===
 function setDateRestrictions() {
     const today = new Date().toISOString().split('T')[0];
@@ -830,6 +812,9 @@ async function registerUser() {
     if (!name || !email || !pass) {
         msg.textContent = ' Please fill in all fields!'; msg.className = 'text-orange-500'; return;
     }
+    if (!email.endsWith('@gmail.com')) {
+        msg.textContent = ' Email must end with @gmail.com'; msg.className = 'text-orange-500'; return;
+    }
     if (pass.length < 6) {
         msg.textContent = ' Password must be at least 6 characters!'; msg.className = 'text-orange-500'; return;
     }
@@ -849,6 +834,11 @@ async function loginUser() {
     const loginButton = document.getElementById('loginButton');
     if (!email || !pass) {
         msg.textContent = ' Enter your email and password.';
+        msg.className = 'text-orange-500';
+        return;
+    }
+    if (!email.endsWith('@gmail.com') && email !== 'nurse@school.ph') {
+        msg.textContent = ' Email must end with @gmail.com';
         msg.className = 'text-orange-500';
         return;
     }
@@ -981,26 +971,23 @@ async function renderMyAppointments() {
 async function updateStats() {
     try {
         const data = await api('/api/stats');
-        document.getElementById('statNew').textContent = data.newRequests;
+        document.getElementById('statTotal').textContent = data.total;
+        document.getElementById('statNew').textContent = data.newToday;
         document.getElementById('statPending').textContent = data.pending;
         document.getElementById('statApproved').textContent = data.approved;
-        document.getElementById('statRejected').textContent = data.rejected;
         document.getElementById('pendingBadge').textContent = data.pending;
     } catch (error) {
         console.error('Failed to load stats:', error);
     }
 }
-
 // === RENDER ALL APPOINTMENTS (NURSE PANEL) ===
 async function renderAllAppointments() {
     const filterRole = document.getElementById('filterRole').value;
     const filterStatus = document.getElementById('filterStatus').value;
-
     try {
         const data = await api('/api/appointments/all');
         let apts = data.appointments;
         apts.forEach(a => { aptCache[a.id] = a; });
-
         // Apply role filter
         if (filterRole !== 'all') {
             apts = apts.filter(a => a.userRole === filterRole);
@@ -1009,13 +996,11 @@ async function renderAllAppointments() {
         if (filterStatus !== 'all') {
             apts = apts.filter(a => a.status === filterStatus);
         }
-
         const tbody = document.getElementById('allAppointmentsTable');
         if (apts.length === 0) {
             tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment requests found.</td></tr>';
             return;
         }
-
         tbody.innerHTML = apts.map((a, i) => {
             const st = statusInfo(a);
             return `
@@ -1053,7 +1038,6 @@ async function renderAllAppointments() {
             `<tr><td colspan="9" class="py-8 text-center text-red-500">? ${error.message}</td></tr>`;
     }
 }
-
 // === APPROVE APPOINTMENT ===
 async function approveAppointment(id) {
     if (!confirm('? Approve this appointment?')) return;
@@ -1067,7 +1051,6 @@ async function approveAppointment(id) {
         alert(`? ${error.message}`);
     }
 }
-
 // === RESCHEDULE APPOINTMENT (REPLACES REJECT) ===
 function openRescheduleModal(id) {
     const a = aptCache[id];
@@ -1137,7 +1120,6 @@ async function submitReschedule() {
         btn.classList.remove('opacity-60', 'cursor-not-allowed');
     }
 }
-
 // === DELETE APPOINTMENT ===
 async function deleteAppointment(id) {
     if (!confirm(' Delete this appointment permanently? This cannot be undone.')) return;
@@ -1152,7 +1134,6 @@ async function deleteAppointment(id) {
         alert(`? ${error.message}`);
     }
 }
-
 // === PRINT APPOINTMENT DETAILS ===
 function printAppointment(id) {
     const a = aptCache[id];
@@ -1165,7 +1146,7 @@ function printAppointment(id) {
         ['Time', a.time],
         ['Visit Type', a.type],
         ['Purpose / Symptoms', a.reason],
-        ['Status', st.text.replace('? ', '')]
+        ['Status', st.text]
     ];
     if (a.rescheduleReason) {
         rows.push(['Reschedule Reason', a.rescheduleReason]);
@@ -1202,27 +1183,23 @@ function printAppointment(id) {
     w.focus();
     setTimeout(() => { w.print(); }, 300);
 }
-
 // === RENDER APPOINTMENT HISTORY ===
 async function renderHistory(oldestFirst = false) {
     try {
         const data = await api('/api/appointments/all');
         let apts = data.appointments;
         apts.forEach(a => { aptCache[a.id] = a; });
-
         // Sort by date/time
         apts.sort((a, b) => {
             const dateA = new Date(`${a.date}T${a.time}`);
             const dateB = new Date(`${b.date}T${b.time}`);
             return oldestFirst ? dateA - dateB : dateB - dateA;
         });
-
         const tbody = document.getElementById('historyTable');
         if (apts.length === 0) {
             tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td></tr>';
             return;
         }
-
         tbody.innerHTML = apts.map((a, i) => {
             const st = statusInfo(a);
             return `
@@ -1252,31 +1229,25 @@ async function renderHistory(oldestFirst = false) {
             `<tr><td colspan="9" class="py-8 text-center text-red-500">? ${error.message}</td></tr>`;
     }
 }
-
 // === SEARCH PATIENT HISTORY ===
 async function searchPatientHistory() {
     const name = document.getElementById('searchPatientName').value.trim().toLowerCase();
     const resultDiv = document.getElementById('patientHistoryResult');
     const tableBody = document.getElementById('patientHistoryTable');
-
     if (!name) {
         alert(' Please enter a name to search.');
         return;
     }
-
     try {
         const data = await api('/api/appointments/all');
         const matches = data.appointments.filter(a => 
             a.userName.toLowerCase().includes(name)
         );
-
         resultDiv.classList.remove('hidden');
-
         if (matches.length === 0) {
             tableBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">No records found for that name.</td></tr>';
             return;
         }
-
         tableBody.innerHTML = matches.map((a, i) => {
             const st = statusInfo(a);
             return `
@@ -1296,7 +1267,6 @@ async function searchPatientHistory() {
         tableBody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">? ${error.message}</td></tr>`;
     }
 }
-
 // === LOGOUT ===
 async function logoutSystem() {
     if (!confirm('Are you sure you want to log out?')) return;
@@ -1316,7 +1286,6 @@ async function logoutSystem() {
     document.getElementById('authMsg').textContent = '';
     showAuthTab('login');
 }
-
 // === INITIALIZE ON PAGE LOAD ===
 document.addEventListener('DOMContentLoaded', () => {
     setDateRestrictions();
@@ -1324,7 +1293,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 """
     return HTML_CONTENT
-
 # === API ROUTES ===
 @app.post("/api/register")
 def register():
@@ -1333,22 +1301,20 @@ def register():
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
     role = data.get("role", "")
-
     if not all([name, email, password, role]):
         return jsonify(error="All fields are required."), 400
+    if not email.endswith("@gmail.com"):
+        return jsonify(error="Email must end with @gmail.com."), 400
     if role not in ("Student", "Teacher", "Staff"):
         return jsonify(error="Invalid role selected."), 400
-
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute("SELECT id FROM users WHERE email = %s", (email,))
         if cur.fetchone():
             return jsonify(error="Email already registered."), 409
-
         password_hash = generate_password_hash(password)
         cur.execute(
             "INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)",
@@ -1362,17 +1328,14 @@ def register():
     finally:
         cur.close()
         conn.close()
-
 @app.post("/api/login")
 def login():
     data = request.get_json()
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
-
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute("SELECT id, name, email, password_hash, role FROM users WHERE email = %s", (email,))
@@ -1381,7 +1344,6 @@ def login():
             return jsonify(error="Email not found."), 401
         if not check_password_hash(row[3], password):
             return jsonify(error="Incorrect password."), 401
-
         session["user_id"] = row[0]
         return jsonify(user={
             "id": row[0],
@@ -1394,23 +1356,19 @@ def login():
     finally:
         cur.close()
         conn.close()
-
 @app.post("/api/logout")
 def logout():
     session.pop("user_id", None)
     return jsonify(message="Logged out successfully."), 200
-
 @app.get("/api/appointments/slots")
 @login_required
 def get_taken_slots():
     selected_date = request.args.get("date")
     if not selected_date:
         return jsonify(error="Date is required."), 400
-
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute("SELECT time FROM appointments WHERE date = %s AND status != 'rejected'", (selected_date,))
@@ -1421,7 +1379,6 @@ def get_taken_slots():
     finally:
         cur.close()
         conn.close()
-
 @app.post("/api/appointments")
 @login_required
 def create_appointment():
@@ -1430,14 +1387,11 @@ def create_appointment():
     time = data.get("time")
     apt_type = data.get("type")
     reason = data.get("reason")
-
     if not all([date, time, apt_type, reason]):
         return jsonify(error="All fields are required."), 400
-
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute("""
@@ -1454,14 +1408,12 @@ def create_appointment():
     finally:
         cur.close()
         conn.close()
-
 @app.get("/api/appointments")
 @login_required
 def get_my_appointments():
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute("""
@@ -1495,14 +1447,12 @@ def get_my_appointments():
     finally:
         cur.close()
         conn.close()
-
 @app.get("/api/appointments/all")
 @nurse_required
 def get_all_appointments():
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute("""
@@ -1535,14 +1485,12 @@ def get_all_appointments():
     finally:
         cur.close()
         conn.close()
-
 @app.post("/api/appointments/<int:apt_id>/approve")
 @nurse_required
 def approve(apt_id):
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute("UPDATE appointments SET status = 'approved' WHERE id = %s", (apt_id,))
@@ -1556,7 +1504,6 @@ def approve(apt_id):
     finally:
         cur.close()
         conn.close()
-
 @app.post("/api/appointments/<int:apt_id>/reject")
 @nurse_required
 def reject(apt_id):
@@ -1564,11 +1511,9 @@ def reject(apt_id):
     rejection_reason = data.get("rejectionReason", "").strip()
     if not rejection_reason:
         return jsonify(error="A rejection reason is required."), 400
-
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute(
@@ -1585,7 +1530,6 @@ def reject(apt_id):
     finally:
         cur.close()
         conn.close()
-
 # === NEW: RESCHEDULE (nurse sets new date/time + required reason) ===
 @app.post("/api/appointments/<int:apt_id>/reschedule")
 @nurse_required
@@ -1594,7 +1538,6 @@ def reschedule(apt_id):
     new_date = (data.get("date") or "").strip()
     new_time = (data.get("time") or "").strip()
     reason = (data.get("reason") or "").strip()
-
     if not reason:
         return jsonify(error="A reschedule reason is required."), 400
     if not new_date or not new_time:
@@ -1607,18 +1550,15 @@ def reschedule(apt_id):
         return jsonify(error="Appointments are Monday–Friday only."), 400
     if new_time not in TIME_SLOTS:
         return jsonify(error="Invalid time slot."), 400
-
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute("SELECT date, time FROM appointments WHERE id = %s", (apt_id,))
         current = cur.fetchone()
         if current is None:
             return jsonify(error="Appointment not found."), 404
-
         cur.execute("""
             UPDATE appointments
             SET old_date = %s, old_time = %s,
@@ -1638,7 +1578,6 @@ def reschedule(apt_id):
     finally:
         cur.close()
         conn.close()
-
 # === NEW: DELETE APPOINTMENT (nurse only) ===
 @app.delete("/api/appointments/<int:apt_id>")
 @nurse_required
@@ -1646,7 +1585,6 @@ def delete_appointment(apt_id):
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute("DELETE FROM appointments WHERE id = %s", (apt_id,))
@@ -1660,27 +1598,27 @@ def delete_appointment(apt_id):
     finally:
         cur.close()
         conn.close()
-
 @app.get("/api/stats")
 @nurse_required
 def get_stats():
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
-
     try:
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM appointments")
         total = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM appointments WHERE created_at >= NOW() - INTERVAL '1 day'")
+        new_today = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM appointments WHERE status = 'pending'")
         pending = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM appointments WHERE status = 'approved'")
         approved = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM appointments WHERE status = 'rejected'")
         rejected = cur.fetchone()[0]
-
         return jsonify({
-            "newRequests": total,
+            "total": total,
+            "newToday": new_today,
             "pending": pending,
             "approved": approved,
             "rejected": rejected
@@ -1690,7 +1628,6 @@ def get_stats():
     finally:
         cur.close()
         conn.close()
-
 # === RUN SERVER ===
 if __name__ == "__main__":
     with app.app_context():

@@ -1,13 +1,15 @@
-from datetime import date, datetime
+from datetime import datetime
 from functools import wraps
 import os
 from pathlib import Path
-import psycopg2  # ? Ginamit ang tamang package
-from flask import Flask, g, jsonify, request, send_from_directory, session
+
+import psycopg2
+from flask import Flask, Response, g, jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 # === DATABASE CONFIGURATION ===
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
 BASE_DIR = Path(__file__).resolve().parent
 app = Flask(__name__, static_folder=str(BASE_DIR), static_url_path="")
 app.config["SECRET_KEY"] = os.environ.get(
@@ -16,36 +18,39 @@ app.config["SECRET_KEY"] = os.environ.get(
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
-# ? IISA LANG NG GET_DB FUNCTION — PARA SA POSTGRESQL
+
+# === ISA LANG NA GET_DB FUNCTION — PARA SA POSTGRESQL ===
 def get_db():
     if "db" not in g:
         try:
             g.db = psycopg2.connect(DATABASE_URL)
             g.db.autocommit = False
         except Exception as e:
-            print(f"? DB Connection Error: {e}")
+            print(f"DB Connection Error: {e}")
             return None
     return g.db
+
 
 @app.teardown_appcontext
 def close_db(_error):
     db = g.pop("db", None)
-    if db is not None:
+    if db is not None and not db.closed:
         db.close()
+
 
 TIME_SLOTS = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
 ]
 
+
 # === DATABASE INITIALIZATION — POSTGRESQL SYNTAX ===
 def init_db():
     conn = get_db()
     if not conn:
-        print("? Hindi makakonekta sa database!")
+        print("Hindi makakonekta sa database!")
         return
     cur = conn.cursor()
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -55,7 +60,6 @@ def init_db():
             role TEXT NOT NULL CHECK(role IN ('Student', 'Teacher', 'Staff', 'nurse'))
         );
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS appointments (
             id SERIAL PRIMARY KEY,
@@ -72,11 +76,12 @@ def init_db():
         );
     """)
     cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rejection_reason TEXT")
-    # NEW: para sa reschedule (reason ng nurse + dating schedule)
+
+    # para sa reschedule (reason ng nurse + dating schedule)
     cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reschedule_reason TEXT")
     cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS old_date TEXT")
     cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS old_time TEXT")
-    
+
     cur.execute("SELECT id FROM users WHERE email = %s", ("nurse@school.ph",))
     nurse = cur.fetchone()
     if nurse is None:
@@ -84,11 +89,10 @@ def init_db():
             "INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)",
             ("School Nurse", "nurse@school.ph", generate_password_hash("nurse123"), "nurse"),
         )
-    
     conn.commit()
     cur.close()
-    conn.close()
-    print("? Database ready!")
+    print("Database ready!")
+
 
 # === AUTH HELPERS ===
 def current_user():
@@ -106,6 +110,7 @@ def current_user():
         return None
     return {"id": user[0], "name": user[1], "email": user[2], "role": user[3]}
 
+
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -116,6 +121,7 @@ def login_required(view):
         return view(*args, **kwargs)
     return wrapped
 
+
 def nurse_required(view):
     @wraps(view)
     @login_required
@@ -125,8 +131,10 @@ def nurse_required(view):
         return view(*args, **kwargs)
     return wrapped
 
+
 def user_dict(user):
     return {"id": user["id"], "name": user["name"], "email": user["email"], "role": user["role"]}
+
 
 def appointment_dict(row):
     return {
@@ -141,581 +149,605 @@ def appointment_dict(row):
         "status": row[8],
     }
 
-# === HTML CONTENT (HINDI BINAGO) ===
-@app.get("/")
-def index():
-    HTML_CONTENT = """
+
+def appointment_rows_to_list(rows):
+    return [
+        {
+            "id": row[0],
+            "userName": row[1],
+            "userRole": row[2],
+            "date": row[3],
+            "time": row[4],
+            "type": row[5],
+            "reason": row[6],
+            "status": row[7],
+            "rejectionReason": row[8],
+            "rescheduleReason": row[9],
+            "oldDate": row[10],
+            "oldTime": row[11],
+        }
+        for row in rows
+    ]
+
+
+# === HTML CONTENT ===
+HTML_CONTENT = r"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> School Clinic - Appointment System</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        * { font-family: 'Inter', sans-serif; }
-        
-        .school-bg {
-            background: linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.15)), 
-                        url('clinic.jpg');
-            background-size: 100% auto;
-            background-position: center;
-            background-attachment: fixed;
-            background-repeat: no-repeat;
-        }
-        .glass {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            color: #000000 !important;
-            box-shadow: 0 8px 40px rgba(0,0,0,0.1);
-            transition: all 0.4s ease;
-        }
-        .glass:hover {
-            box-shadow: 0 12px 50px rgba(0,0,0,0.15);
-            border-color: rgba(255,255,255,0.6);
-        }
-        .dashboard-card {
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 16px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-            transition: all 0.35s ease;
-        }
-        .dashboard-card:hover {
-            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
-            transform: translateY(-2px);
-        }
-        .sidebar-link {
-            transition: all 0.3s ease;
-        }
-        .sidebar-link:hover, .sidebar-link.active {
-            background: rgba(255, 255, 255, 0.18);
-            border-left: 4px solid #fbbf24;
-        }
-        .stat-card {
-            border-radius: 16px;
-            transition: all 0.35s ease;
-        }
-        .stat-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
-        }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .tab-active {
-            border-bottom: 3px solid #3b82f6;
-            color: #000000;
-            font-weight: 600;
-        }
-        .status-pending { background: #fef08a; color: #854d0e; }
-        .status-approved { background: #bbf7d0; color: #166534; }
-        .status-rejected { background: #fecaca; color: #991b1b; }
-        .status-rescheduled { background: #bfdbfe; color: #1e40af; }
-        .history-panel {
-            max-height: 550px;
-            overflow-y: auto;
-        }
-        .password-wrapper { position: relative; }
-        .eye-icon {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            cursor: pointer;
-            color: #6b7280;
-        }
-        .password-wrapper input { padding-right: 40px !important; }
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 4px rgba(251, 191, 36, 0.4); }
-            50% { box-shadow: 0 0 15px rgba(251, 191, 36, 0.7); }
-        }
-        .animate-pulse { animation: pulse-glow 1.5s ease-in-out infinite; }
-        .time-slot {
-            transition: all 0.25s ease;
-            cursor: pointer;
-        }
-        .time-slot:hover:not(.taken) {
-            background-color: #dbeafe;
-            border-color: #3b82f6;
-            transform: scale(1.03);
-        }
-        .time-slot.taken {
-            background-color: #f3f4f6;
-            color: #9ca3af;
-            border-color: #e5e7eb;
-            cursor: not-allowed;
-            text-decoration: line-through;
-        }
-        .time-slot.selected {
-            background-color: #dbeafe;
-            border-color: #2563eb;
-            border-width: 2px;
-            font-weight: 600;
-            color: #1e40af;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Clinic - Appointment System</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+* { font-family: 'Inter', sans-serif; }
+html { scroll-behavior: smooth; }
+
+/* ===== BACKGROUND ===== */
+.school-bg {
+    background: linear-gradient(rgba(255,255,255,0.15), rgba(255,255,255,0.15)), url('clinic.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+}
+
+/* ===== GLASS LOGIN CARD ===== */
+.glass {
+    background: rgba(255,255,255,0.35);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.5);
+    color: #000000 !important;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+    transition: all 0.4s ease;
+}
+.glass:hover { box-shadow: 0 12px 50px rgba(0,0,0,0.18); }
+
+/* Lahat ng text sa login form ay itim */
+.glass, .glass label, .glass h1, .glass p, .glass span, .glass button.auth-tab, .glass input, .glass select {
+    color: #000000;
+}
+.glass input::placeholder { color: #6b7280; }
+.glass input, .glass select { background: rgba(255,255,255,0.85); }
+
+/* ===== BLUE ROTATING LIGHTS AROUND LOGIN FORM ===== */
+@property --angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+.login-wrap { position: relative; width: 100%; max-width: 28rem; }
+.glow-ring {
+    position: absolute;
+    inset: -3px;
+    border-radius: 20px;
+    padding: 3px;
+    background: conic-gradient(from var(--angle),
+        transparent 0deg, transparent 40deg,
+        #1d4ed8 90deg, #3b82f6 130deg, #60a5fa 160deg, #22d3ee 180deg,
+        transparent 220deg, transparent 220deg,
+        #2563eb 270deg, #60a5fa 310deg, #93c5fd 330deg, transparent 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: spinLight 4s linear infinite;
+    pointer-events: none;
+}
+.glow-ring.blur { filter: blur(10px); opacity: 0.9; inset: -6px; padding: 6px; }
+@keyframes spinLight { to { --angle: 360deg; } }
+
+/* Fallback kapag walang @property support */
+@supports not (background: conic-gradient(from var(--angle), red, blue)) {
+    .glow-ring { animation: none; }
+}
+
+/* ===== DASHBOARD ===== */
+.dashboard-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    transition: all 0.35s ease;
+}
+.dashboard-card:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.08); transform: translateY(-2px); }
+.sidebar-link { transition: all 0.3s ease; border-left: 4px solid transparent; }
+.sidebar-link:hover, .sidebar-link.active { background: rgba(255,255,255,0.18); border-left: 4px solid #fbbf24; }
+.stat-card { border-radius: 16px; transition: all 0.35s ease; }
+.stat-card:hover { transform: translateY(-6px); box-shadow: 0 15px 35px rgba(0,0,0,0.15); }
+.fade-in { animation: fadeIn 0.5s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== SIGN IN / CREATE ACCOUNT TABS — ITIM PALAGI ===== */
+.auth-tab {
+    color: #000000 !important;
+    font-weight: 500;
+    border-bottom: 3px solid transparent;
+    transition: border-color 0.25s ease, background 0.25s ease, font-weight 0.25s ease;
+    border-radius: 8px 8px 0 0;
+}
+.auth-tab:hover { background: rgba(59,130,246,0.10); color: #000000 !important; }
+.auth-tab:focus, .auth-tab:active { color: #000000 !important; outline: none; }
+.auth-tab i { color: #000000 !important; }
+.tab-active { border-bottom: 3px solid #3b82f6 !important; color: #000000 !important; font-weight: 700 !important; }
+
+.status-pending { background: #fef08a; color: #854d0e; }
+.status-approved { background: #bbf7d0; color: #166534; }
+.status-rejected { background: #fecaca; color: #991b1b; }
+.status-rescheduled { background: #bfdbfe; color: #1e40af; }
+.history-panel { max-height: 550px; overflow-y: auto; }
+
+.password-wrapper { position: relative; }
+.eye-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #374151; }
+.eye-icon:hover { color: #000000; }
+.password-wrapper input { padding-right: 40px !important; }
+
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 4px rgba(251,191,36,0.4); }
+    50% { box-shadow: 0 0 15px rgba(251,191,36,0.7); }
+}
+.animate-pulse { animation: pulse-glow 1.5s ease-in-out infinite; }
+
+.time-slot { transition: all 0.25s ease; cursor: pointer; }
+.time-slot:hover:not(.taken) { background-color: #dbeafe; border-color: #3b82f6; transform: scale(1.03); }
+.time-slot.taken { background-color: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; text-decoration: line-through; }
+.time-slot.selected { background-color: #dbeafe; border-color: #2563eb; border-width: 2px; font-weight: 600; color: #1e40af; }
+
+/* Input focus + button polish */
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.25); }
+button { transition: transform 0.15s ease, background-color 0.2s ease, opacity 0.2s ease; }
+button:not(:disabled):active { transform: scale(0.97); }
+tbody tr { transition: background-color 0.2s ease; }
+
+/* Spinner */
+.spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.5); border-top-color:#fff; border-radius:50%; animation: spin 0.7s linear infinite; vertical-align:-2px; margin-right:6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .glow-ring { animation-duration: 12s; }
+    .fade-in { animation: none; }
+}
+</style>
 </head>
-<body class="bg-black-50 min-h-screen">
+<body class="bg-gray-50 min-h-screen">
 
-<!--  LOGIN PAGE -->
+<!-- LOGIN PAGE -->
 <div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4">
-    <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
-        <!-- Logo + Title - Nakasentro at Walang Background -->
-        <div class="text-center mb-8">
-            <img 
-                src="slsu.png.png" 
-                class="w-20 h-20 object-contain mx-auto mb-3 bg-transparent p-0 border-0"
-                alt="SLSU Logo"
-            >
-            <h1 class="text-2xl font-bold text-black-800">Clinic Appointment System</h1>
-            <p class="text-black-500">School Clinic Appointment System</p>
-        </div>
+  <div class="login-wrap fade-in">
+    <div class="glow-ring blur"></div>
+    <div class="glow-ring"></div>
 
-        <div class="flex mb-6 border-b border-black-200">
-            <button id="tabLogin" class="flex-1 py-3 text-center tab-active" onclick="showAuthTab('login')">
-                <i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In
-            </button>
-            <button id="tabRegister" class="flex-1 py-3 text-center text-black-500" onclick="showAuthTab('register')">
-                <i class="fa-solid fa-user-plus mr-2"></i> Create Account
-            </button>
-        </div>
+    <div class="glass rounded-2xl shadow-2xl p-8 w-full relative">
+      <div class="text-center mb-8">
+        <img src="slsu.png.png" class="w-20 h-20 object-contain mx-auto mb-3 bg-transparent p-0 border-0" alt="SLSU Logo">
+        <h1 class="text-2xl font-bold">Clinic Appointment System</h1>
+        <p>School Clinic Appointment System</p>
+      </div>
 
-        <!-- LOGIN FORM -->
-        <div id="formLogin">
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-black-700 font-medium mb-1">Email</label>
-                    <input type="email" id="loginEmail" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your@gmail.com">
-                </div>
-                <div>
-                    <label class="block text-black-700 font-medium mb-1">Password</label>
-                    <div class="password-wrapper">
-                        <input type="password" id="loginPass" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="At least 6 characters">
-                        <i class="fa-solid fa-eye eye-icon" id="eyeLogin" onclick="togglePassword('loginPass', 'eyeLogin')"></i>
-                    </div>
-                </div>
-                <button id="loginButton" onclick="loginUser()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold">
-                    Sign In
-                </button>
-            </div>
-        </div>
-
-        <!-- REGISTER FORM -->
-        <div id="formRegister" class="hidden">
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-black-700 font-medium mb-1">Full Name</label>
-                    <input type="text" id="regName" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Juan Dela Cruz">
-                </div>
-                <div>
-                    <label class="block text-black-700 font-medium mb-1">Email</label>
-                    <input type="email" id="regEmail" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="your@gmail.com">
-                </div>
-                <div>
-                    <label class="block text-black-700 font-medium mb-1">Password</label>
-                    <div class="password-wrapper">
-                        <input type="password" id="regPass" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="At least 6 characters">
-                        <i class="fa-solid fa-eye eye-icon" id="eyeReg" onclick="togglePassword('regPass', 'eyeReg')"></i>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-black-700 font-medium mb-1">You are a...</label>
-                    <select id="regRole" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                        <option value="Student">  Student</option>
-                        <option value="Teacher">  Teacher</option>
-                        <option value="Staff">  Staff</option>
-                    </select>
-                </div>
-                <button onclick="registerUser()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold">
-                    Create Account
-                </button>
-            </div>
-        </div>
-
-        <p id="authMsg" class="mt-4 text-center font-medium"></p>
-    </div>
-</div>
-
-<!--  USER DASHBOARD -->
-<div id="userDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
-    <!-- Mobile Menu Button -->
-    <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
-        <span class="font-bold">Clinic</span>
-        <button id="userMenuBtn" class="text-xl"><i class="fa-solid fa-bars"></i></button>
-    </div>
-
-    <!-- Sidebar -->
-    <aside id="userSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
-        <div class="p-4">
-            <div class="flex items-center gap-3 mb-8 mt-2">
-                <i class="fa-solid fa-heart-pulse text-2xl text-red-400"></i>
-                <span class="font-bold text-lg">Clinic</span>
-            </div>
-            <nav class="space-y-1">
-                <a href="#" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg text-white">
-                    <i class="fa-solid fa-house w-5 text-center"></i> Dashboard
-                </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100">
-                    <i class="fa-solid fa-calendar-check w-5 text-center"></i> My Appointments
-                </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" onclick="logoutSystem()">
-                    <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Log Out
-                </a>
-            </nav>
-        </div>
-    </aside>
-
-    <!-- Overlay -->
-    <div id="userOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleUserSidebar()"></div>
-
-    <main class="flex-1 p-4 md:p-6 bg-black-50">
-        <div class="dashboard-card p-4 mb-6 flex justify-between items-center fade-in">
-            <div>
-                <h2 class="text-xl font-bold text-black-800">Welcome, <span id="displayName"></span>!</h2>
-                <p class="text-black-500 text-sm" id="displayRole"></p>
-            </div>
-            <button onclick="logoutSystem()" class="md:hidden bg-red-500 text-white px-3 py-2 rounded-lg text-sm">
-                <i class="fa-solid fa-right-from-bracket"></i>
-            </button>
-        </div>
-
-        <div class="dashboard-card p-6 mb-6 fade-in">
-            <h3 class="text-lg font-bold text-black-800 mb-4"> Book an Appointment</h3>
-            <div class="grid md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label class="block text-black-600 text-sm font-medium mb-1">Select Date (Monday–Friday only)</label>
-                    <input type="date" id="aptDate" class="w-full px-3 py-2 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="loadAvailableTimeSlots()">
-                </div>
-                <div>
-                    <label class="block text-black-600 text-sm font-medium mb-1">Available Time Slot</label>
-                    <input type="hidden" id="aptTime">
-                    <div id="timeSlotsContainer" class="grid grid-cols-3 gap-2">
-                        <span class="text-black-400 text-sm col-span-3">Select a date first...</span>
-                    </div>
-                </div>
-            </div>
-            <div class="mb-4">
-                <label class="block text-black-600 text-sm font-medium mb-1">Visit Type</label>
-                <select id="aptType" class="w-full px-3 py-2 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option>General Consultation</option>
-                    <option>First Aid / Minor Injury</option>
-                    <option>Headache</option>
-                    <option>Fever / Flu Symptoms</option>
-                    <option>Stomach / Abdominal Pain</option>
-                    <option>Medicine Request</option>
-                    <option>Other Medical Concern</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-black-600 text-sm font-medium mb-1">Purpose / Symptoms</label>
-                <textarea id="aptReason" rows="3" class="w-full px-3 py-2 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Describe your symptoms..."></textarea>
-            </div>
-            <button id="submitAppointmentButton" onclick="submitAppointment()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold">
-                <i class="fa-solid fa-paper-plane mr-2"></i> Submit Request
-            </button>
-        </div>
-
-        <div class="dashboard-card p-6 fade-in">
-            <h3 class="text-lg font-bold text-gray-800 mb-4"> My Appointments</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="text-left text-gray-500 border-b">
-                            <th class="py-2 px-2">#</th>
-                            <th class="py-2 px-2">Date</th>
-                            <th class="py-2 px-2">Time</th>
-                            <th class="py-2 px-2">Type</th>
-                            <th class="py-2 px-2">Purpose</th>
-                            <th class="py-2 px-2">Status</th>
-                            <th class="py-2 px-2">Rejection / Reschedule Reason</th>
-                        </tr>
-                    </thead>
-                    <tbody id="myAppointmentsTable">
-                        <tr><td colspan="7" class="py-4 text-center text-gray-400 italic">No appointments yet.</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
-</div>
-
-<!--  NURSE DASHBOARD -->
-<div id="nurseDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
-    <!-- Mobile Menu Button -->
-    <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
-        <div>
-            <span class="font-bold">NURSE PANEL</span>
-            <p class="text-xs text-blue-200">Clinic Management</p>
-        </div>
-        <button id="nurseMenuBtn" class="text-xl"><i class="fa-solid fa-bars"></i></button>
-    </div>
-
-    <!-- Sidebar -->
-    <aside id="nurseSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
-        <div class="p-4">
-            <div class="flex items-center gap-3 mb-8 mt-2">
-                <i class="fa-solid fa-user-nurse text-2xl text-yellow-400"></i>
-                <div>
-                    <span class="font-bold text-lg">NURSE PANEL</span>
-                    <p class="text-xs text-blue-200">Clinic Management</p>
-                </div>
-            </div>
-            <nav class="space-y-1">
-                <a href="#" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg text-white" id="navDashboard" onclick="showNurseTab('dashboard')">
-                    <i class="fa-solid fa-chart-pie w-5 text-center"></i> Dashboard
-                </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" id="navHistory" onclick="showNurseTab('history')">
-                    <i class="fa-solid fa-clock-rotate-left w-5 text-center"></i> Appointment History
-                </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" id="navAppointments" onclick="showNurseTab('appointments')">
-                    <i class="fa-solid fa-calendar-check w-5 text-center"></i> All Appointments
-                </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" onclick="logoutSystem()">
-                    <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Log Out
-                </a>
-            </nav>
-        </div>
-    </aside>
-
-    <!-- Overlay -->
-    <div id="nurseOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleNurseSidebar()"></div>
-
-    <main class="flex-1 p-4 md:p-6 bg-gray-50">
-        <!-- DASHBOARD VIEW -->
-        <div id="nurseViewDashboard" class="fade-in">
-            <div class="dashboard-card p-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                        <i class="fa-solid fa-user-nurse text-blue-700 text-xl"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-gray-800">Nurse Dashboard</h2>
-                        <p class="text-gray-500 text-sm">Manage all clinic appointment requests</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-2">
-                        <span class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
-                        <span id="pendingBadge">0</span> Pending
-                    </span>
-                    <button onclick="logoutSystem()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                        <i class="fa-solid fa-right-from-bracket mr-1"></i> Log Out
-                    </button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div class="stat-card bg-blue-500 text-white p-4">
-                    <div class="flex items-center justify-between">
-                        <div><p class="text-blue-100 text-sm">All Patients</p><p class="text-3xl font-bold" id="statTotal">0</p></div>
-                        <i class="fa-solid fa-users text-3xl text-blue-200"></i>
-                    </div>
-                </div>
-                <div class="stat-card bg-cyan-500 text-white p-4">
-                    <div class="flex items-center justify-between">
-                        <div><p class="text-cyan-100 text-sm">New Requests</p><p class="text-3xl font-bold" id="statNew">0</p></div>
-                        <i class="fa-solid fa-calendar-plus text-3xl text-cyan-200"></i>
-                    </div>
-                </div>
-                <div class="stat-card bg-yellow-500 text-white p-4">
-                    <div class="flex items-center justify-between">
-                        <div><p class="text-yellow-100 text-sm">Pending</p><p class="text-3xl font-bold" id="statPending">0</p></div>
-                        <i class="fa-solid fa-clock text-3xl text-yellow-200"></i>
-                    </div>
-                </div>
-                <div class="stat-card bg-green-500 text-white p-4">
-                    <div class="flex items-center justify-between">
-                        <div><p class="text-green-100 text-sm">Approved</p><p class="text-3xl font-bold" id="statApproved">0</p></div>
-                        <i class="fa-solid fa-check-circle text-3xl text-green-200"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div class="dashboard-card p-4 mb-6">
-    <h3 class="text-lg font-bold text-gray-800 mb-3"> Search Patient History</h3>
-    
-    <!-- Search Bar - Responsive -->
-    <div class="flex flex-col sm:flex-row gap-3 mb-4">
-        <input type="text" id="searchPatientName" placeholder="Type patient name..." 
-            class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full">
-        <button onclick="searchPatientHistory()" 
-            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold whitespace-nowrap w-full sm:w-auto">
-            <i class="fa-solid fa-magnifying-glass mr-2"></i> Search
+      <div class="flex mb-6 border-b border-black/20">
+        <button id="tabLogin" class="auth-tab flex-1 py-3 text-center tab-active" onclick="showAuthTab('login')">
+          <i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In
         </button>
-    </div>
-                <div id="patientHistoryResult" class="mt-4 hidden">
-                    <h4 class="font-bold text-gray-700 mb-2"> Appointment History:</h4>
-                    <div class="history-panel overflow-x-auto border rounded-lg">
-                        <table class="w-full min-w-max text-sm">
-                            <thead class="bg-gray-100">
-                                <tr>
-                                    <th class="py-2 px-3 text-left whitespace-nowrap">#</th>
-                                    <th class="py-2 px-3 text-left whitespace-nowrap">Date</th>
-                                    <th class="py-2 px-3 text-left whitespace-nowrap">Time</th>
-                                    <th class="py-2 px-3 text-left whitespace-nowrap">Type</th>
-                                    <th class="py-2 px-3 text-left whitespace-nowrap">Symptoms</th>
-                                    <th class="py-2 px-3 text-left whitespace-nowrap">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="patientHistoryTable"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <button id="tabRegister" class="auth-tab flex-1 py-3 text-center" onclick="showAuthTab('register')">
+          <i class="fa-solid fa-user-plus mr-2"></i> Create Account
+        </button>
+      </div>
 
-      <!-- APPOINTMENT HISTORY VIEW -->
-<div id="nurseViewHistory" class="hidden fade-in">
-    <div class="dashboard-card p-4 sm:p-6">
-        <!-- Header & Sort Buttons - Responsive Layout -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
-            <h3 class="text-lg font-bold text-gray-800">
-                <i class="fa-solid fa-clock-rotate-left mr-2 text-blue-600"></i> Appointment History
-                <span class="text-sm font-normal text-gray-500 ml-2">(Chronological Order)</span>
-            </h3>
-            <div class="flex gap-2 w-full sm:w-auto">
-                <button onclick="renderHistory(true)" class="flex-1 sm:flex-none px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
-                    <i class="fa-solid fa-arrow-up-short-wide mr-1"></i> Oldest First
-                </button>
-                <button onclick="renderHistory(false)" class="flex-1 sm:flex-none px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
-                    <i class="fa-solid fa-arrow-down-wide-short mr-1"></i> Newest First
-                </button>
+      <!-- LOGIN FORM -->
+      <div id="formLogin">
+        <div class="space-y-4">
+          <div>
+            <label class="block font-medium mb-1">Email</label>
+            <input type="email" id="loginEmail" autocomplete="username" class="w-full px-4 py-2.5 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your@gmail.com">
+          </div>
+          <div>
+            <label class="block font-medium mb-1">Password</label>
+            <div class="password-wrapper">
+              <input type="password" id="loginPass" autocomplete="current-password" class="w-full px-4 py-2.5 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="At least 6 characters">
+              <i class="fa-solid fa-eye eye-icon" id="eyeLogin" onclick="togglePassword('loginPass', 'eyeLogin')"></i>
             </div>
+          </div>
+          <button id="loginButton" onclick="loginUser()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold shadow-lg shadow-blue-500/30">
+            Sign In
+          </button>
         </div>
+      </div>
 
-        <!--  Pinakaayos na Scrollable Table Container -->
-        <div class="w-full overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-            <table class="w-full text-sm min-w-max">
-                <thead class="bg-gray-50">
-                    <tr class="text-left text-gray-600 border-b-2 border-gray-200">
-                        <th class="py-3 px-3 font-semibold text-center whitespace-nowrap">#</th>
-                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Name</th>
-                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Role</th>
-                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Date</th>
-                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Time</th>
-                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Visit Type</th>
-                        <th class="py-3 px-3 font-semibold whitespace-nowrap">Purpose</th>
-                        <th class="py-3 px-3 font-semibold text-center whitespace-nowrap">Status</th>
-                        <th class="py-3 px-3 font-semibold text-center whitespace-nowrap">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="historyTable">
-                    <tr>
-                        <td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td>
-                    </tr>
-                </tbody>
-            </table>
+      <!-- REGISTER FORM -->
+      <div id="formRegister" class="hidden">
+        <div class="space-y-4">
+          <div>
+            <label class="block font-medium mb-1">Full Name</label>
+            <input type="text" id="regName" class="w-full px-4 py-2.5 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Juan Dela Cruz">
+          </div>
+          <div>
+            <label class="block font-medium mb-1">Email</label>
+            <input type="email" id="regEmail" autocomplete="username" class="w-full px-4 py-2.5 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="your@gmail.com">
+          </div>
+          <div>
+            <label class="block font-medium mb-1">Password</label>
+            <div class="password-wrapper">
+              <input type="password" id="regPass" autocomplete="new-password" class="w-full px-4 py-2.5 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="At least 6 characters">
+              <i class="fa-solid fa-eye eye-icon" id="eyeReg" onclick="togglePassword('regPass', 'eyeReg')"></i>
+            </div>
+          </div>
+          <div>
+            <label class="block font-medium mb-1">You are a...</label>
+            <select id="regRole" class="w-full px-4 py-2.5 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+              <option value="Student">Student</option>
+              <option value="Teacher">Teacher</option>
+              <option value="Staff">Staff</option>
+            </select>
+          </div>
+          <button id="registerButton" onclick="registerUser()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold shadow-lg shadow-green-500/30">
+            Create Account
+          </button>
         </div>
+      </div>
+
+      <p id="authMsg" class="mt-4 text-center font-medium"></p>
     </div>
+  </div>
 </div>
 
-        <!-- ALL APPOINTMENTS VIEW -->
-        <div id="nurseViewAppointments" class="hidden fade-in">
-            <div class="dashboard-card p-6">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
-                    <h3 class="text-lg font-bold text-gray-800"> ALL Clinic Appointments</h3>
-                    <div class="flex gap-2">
-                        <select id="filterRole" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm">
-                            <option value="all">All Roles</option>
-                            <option value="Student">Student</option>
-                            <option value="Teacher">Teacher</option>
-                            <option value="Staff">Staff</option>
-                        </select>
-                        <select id="filterStatus" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm">
-                            <option value="all">All Status</option>
-                            <option value="pending">Pending</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="text-left text-gray-600 border-b-2 border-gray-100">
-                                <th class="py-3 px-3 font-semibold">#</th>
-                                <th class="py-3 px-3 font-semibold">Name</th>
-                                <th class="py-3 px-3 font-semibold">Role</th>
-                                <th class="py-3 px-3 font-semibold">Date</th>
-                                <th class="py-3 px-3 font-semibold">Time</th>
-                                <th class="py-3 px-3 font-semibold">Visit Type</th>
-                                <th class="py-3 px-3 font-semibold">Concern</th>
-                                <th class="py-3 px-3 font-semibold text-center">Status</th>
-                                <th class="py-3 px-3 font-semibold text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="allAppointmentsTable">
-                            <tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment requests yet.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+<!-- USER DASHBOARD -->
+<div id="userDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
+  <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
+    <span class="font-bold">Clinic</span>
+    <button id="userMenuBtn" class="text-xl"><i class="fa-solid fa-bars"></i></button>
+  </div>
+
+  <aside id="userSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+    <div class="p-4">
+      <div class="flex items-center gap-3 mb-8 mt-2">
+        <i class="fa-solid fa-heart-pulse text-2xl text-red-400"></i>
+        <span class="font-bold text-lg">Clinic</span>
+      </div>
+      <nav class="space-y-1">
+        <a href="#" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg text-white">
+          <i class="fa-solid fa-house w-5 text-center"></i> Dashboard
+        </a>
+        <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100">
+          <i class="fa-solid fa-calendar-check w-5 text-center"></i> My Appointments
+        </a>
+        <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" onclick="logoutSystem()">
+          <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Log Out
+        </a>
+      </nav>
+    </div>
+  </aside>
+
+  <div id="userOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleUserSidebar()"></div>
+
+  <main class="flex-1 p-4 md:p-6 bg-gray-50">
+    <div class="dashboard-card p-4 mb-6 flex justify-between items-center fade-in">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800">Welcome, <span id="displayName"></span>!</h2>
+        <p class="text-gray-500 text-sm" id="displayRole"></p>
+      </div>
+      <button onclick="logoutSystem()" class="md:hidden bg-red-500 text-white px-3 py-2 rounded-lg text-sm">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+    </div>
+
+    <div class="dashboard-card p-6 mb-6 fade-in">
+      <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-calendar-plus text-blue-600 mr-2"></i>Book an Appointment</h3>
+      <div class="grid md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-gray-600 text-sm font-medium mb-1">Select Date (Monday–Friday only)</label>
+          <input type="date" id="aptDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="loadAvailableTimeSlots()">
         </div>
-    </main>
+        <div>
+          <label class="block text-gray-600 text-sm font-medium mb-1">Available Time Slot</label>
+          <input type="hidden" id="aptTime">
+          <div id="timeSlotsContainer" class="grid grid-cols-3 gap-2">
+            <span class="text-gray-400 text-sm col-span-3">Select a date first...</span>
+          </div>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-gray-600 text-sm font-medium mb-1">Visit Type</label>
+        <select id="aptType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option>General Consultation</option>
+          <option>First Aid / Minor Injury</option>
+          <option>Headache</option>
+          <option>Fever / Flu Symptoms</option>
+          <option>Stomach / Abdominal Pain</option>
+          <option>Medicine Request</option>
+          <option>Other Medical Concern</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-gray-600 text-sm font-medium mb-1">Purpose / Symptoms</label>
+        <textarea id="aptReason" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Describe your symptoms..."></textarea>
+      </div>
+      <button id="submitAppointmentButton" onclick="submitAppointment()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold">
+        <i class="fa-solid fa-paper-plane mr-2"></i> Submit Request
+      </button>
+    </div>
+
+    <div class="dashboard-card p-6 fade-in">
+      <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-list-check text-blue-600 mr-2"></i>My Appointments</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-gray-500 border-b">
+              <th class="py-2 px-2">#</th>
+              <th class="py-2 px-2">Date</th>
+              <th class="py-2 px-2">Time</th>
+              <th class="py-2 px-2">Type</th>
+              <th class="py-2 px-2">Purpose</th>
+              <th class="py-2 px-2">Status</th>
+              <th class="py-2 px-2">Rejection / Reschedule Reason</th>
+            </tr>
+          </thead>
+          <tbody id="myAppointmentsTable">
+            <tr><td colspan="7" class="py-4 text-center text-gray-400 italic">No appointments yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- NURSE DASHBOARD -->
+<div id="nurseDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
+  <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
+    <div>
+      <span class="font-bold">NURSE PANEL</span>
+      <p class="text-xs text-blue-200">Clinic Management</p>
+    </div>
+    <button id="nurseMenuBtn" class="text-xl"><i class="fa-solid fa-bars"></i></button>
+  </div>
+
+  <aside id="nurseSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+    <div class="p-4">
+      <div class="flex items-center gap-3 mb-8 mt-2">
+        <i class="fa-solid fa-user-nurse text-2xl text-yellow-400"></i>
+        <div>
+          <span class="font-bold text-lg">NURSE PANEL</span>
+          <p class="text-xs text-blue-200">Clinic Management</p>
+        </div>
+      </div>
+      <nav class="space-y-1">
+        <a href="#" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg text-white" id="navDashboard" onclick="showNurseTab('dashboard')">
+          <i class="fa-solid fa-chart-pie w-5 text-center"></i> Dashboard
+        </a>
+        <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" id="navHistory" onclick="showNurseTab('history')">
+          <i class="fa-solid fa-clock-rotate-left w-5 text-center"></i> Appointment History
+        </a>
+        <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" id="navAppointments" onclick="showNurseTab('appointments')">
+          <i class="fa-solid fa-calendar-check w-5 text-center"></i> All Appointments
+        </a>
+        <a href="#" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100" onclick="logoutSystem()">
+          <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Log Out
+        </a>
+      </nav>
+    </div>
+  </aside>
+
+  <div id="nurseOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleNurseSidebar()"></div>
+
+  <main class="flex-1 p-4 md:p-6 bg-gray-50">
+
+    <!-- DASHBOARD VIEW -->
+    <div id="nurseViewDashboard" class="fade-in">
+      <div class="dashboard-card p-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+            <i class="fa-solid fa-user-nurse text-blue-700 text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-gray-800">Nurse Dashboard</h2>
+            <p class="text-gray-500 text-sm">Manage all clinic appointment requests</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-2">
+            <span class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+            <span id="pendingBadge">0</span> Pending
+          </span>
+          <button onclick="logoutSystem()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            <i class="fa-solid fa-right-from-bracket mr-1"></i> Log Out
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card bg-blue-500 text-white p-4">
+          <div class="flex items-center justify-between">
+            <div><p class="text-blue-100 text-sm">All Patients</p><p class="text-3xl font-bold" id="statTotal">0</p></div>
+            <i class="fa-solid fa-users text-3xl text-blue-200"></i>
+          </div>
+        </div>
+        <div class="stat-card bg-cyan-500 text-white p-4">
+          <div class="flex items-center justify-between">
+            <div><p class="text-cyan-100 text-sm">New Requests</p><p class="text-3xl font-bold" id="statNew">0</p></div>
+            <i class="fa-solid fa-calendar-plus text-3xl text-cyan-200"></i>
+          </div>
+        </div>
+        <div class="stat-card bg-yellow-500 text-white p-4">
+          <div class="flex items-center justify-between">
+            <div><p class="text-yellow-100 text-sm">Pending</p><p class="text-3xl font-bold" id="statPending">0</p></div>
+            <i class="fa-solid fa-clock text-3xl text-yellow-200"></i>
+          </div>
+        </div>
+        <div class="stat-card bg-green-500 text-white p-4">
+          <div class="flex items-center justify-between">
+            <div><p class="text-green-100 text-sm">Approved</p><p class="text-3xl font-bold" id="statApproved">0</p></div>
+            <i class="fa-solid fa-check-circle text-3xl text-green-200"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-card p-4 mb-6">
+        <h3 class="text-lg font-bold text-gray-800 mb-3"><i class="fa-solid fa-magnifying-glass text-blue-600 mr-2"></i>Search Patient History</h3>
+        <div class="flex flex-col sm:flex-row gap-3 mb-4">
+          <input type="text" id="searchPatientName" placeholder="Type patient name..." class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full">
+          <button onclick="searchPatientHistory()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold whitespace-nowrap w-full sm:w-auto">
+            <i class="fa-solid fa-magnifying-glass mr-2"></i> Search
+          </button>
+        </div>
+        <div id="patientHistoryResult" class="mt-4 hidden">
+          <h4 class="font-bold text-gray-700 mb-2">Appointment History:</h4>
+          <div class="history-panel overflow-x-auto border rounded-lg">
+            <table class="w-full min-w-max text-sm">
+              <thead class="bg-gray-100">
+                <tr>
+                  <th class="py-2 px-3 text-left whitespace-nowrap">#</th>
+                  <th class="py-2 px-3 text-left whitespace-nowrap">Date</th>
+                  <th class="py-2 px-3 text-left whitespace-nowrap">Time</th>
+                  <th class="py-2 px-3 text-left whitespace-nowrap">Type</th>
+                  <th class="py-2 px-3 text-left whitespace-nowrap">Symptoms</th>
+                  <th class="py-2 px-3 text-left whitespace-nowrap">Status</th>
+                </tr>
+              </thead>
+              <tbody id="patientHistoryTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- APPOINTMENT HISTORY VIEW -->
+    <div id="nurseViewHistory" class="hidden fade-in">
+      <div class="dashboard-card p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+          <h3 class="text-lg font-bold text-gray-800">
+            <i class="fa-solid fa-clock-rotate-left mr-2 text-blue-600"></i>
+            Appointment History
+            <span class="text-sm font-normal text-gray-500 ml-2">(Chronological Order)</span>
+          </h3>
+          <div class="flex gap-2 w-full sm:w-auto">
+            <button onclick="renderHistory(true)" class="flex-1 sm:flex-none px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+              <i class="fa-solid fa-arrow-up-short-wide mr-1"></i> Oldest First
+            </button>
+            <button onclick="renderHistory(false)" class="flex-1 sm:flex-none px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+              <i class="fa-solid fa-arrow-down-wide-short mr-1"></i> Newest First
+            </button>
+          </div>
+        </div>
+
+        <div class="w-full overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+          <table class="w-full text-sm min-w-max">
+            <thead class="bg-gray-50">
+              <tr class="text-left text-gray-600 border-b-2 border-gray-200">
+                <th class="py-3 px-3 font-semibold text-center whitespace-nowrap">#</th>
+                <th class="py-3 px-3 font-semibold whitespace-nowrap">Name</th>
+                <th class="py-3 px-3 font-semibold whitespace-nowrap">Role</th>
+                <th class="py-3 px-3 font-semibold whitespace-nowrap">Date</th>
+                <th class="py-3 px-3 font-semibold whitespace-nowrap">Time</th>
+                <th class="py-3 px-3 font-semibold whitespace-nowrap">Visit Type</th>
+                <th class="py-3 px-3 font-semibold whitespace-nowrap">Purpose</th>
+                <th class="py-3 px-3 font-semibold text-center whitespace-nowrap">Status</th>
+                <th class="py-3 px-3 font-semibold text-center whitespace-nowrap">Action</th>
+              </tr>
+            </thead>
+            <tbody id="historyTable">
+              <tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL APPOINTMENTS VIEW -->
+    <div id="nurseViewAppointments" class="hidden fade-in">
+      <div class="dashboard-card p-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
+          <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-calendar-check text-blue-600 mr-2"></i>ALL Clinic Appointments</h3>
+          <div class="flex gap-2">
+            <select id="filterRole" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm">
+              <option value="all">All Roles</option>
+              <option value="Student">Student</option>
+              <option value="Teacher">Teacher</option>
+              <option value="Staff">Staff</option>
+            </select>
+            <select id="filterStatus" onchange="renderAllAppointments()" class="px-3 py-1.5 border rounded-lg text-sm">
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-600 border-b-2 border-gray-100">
+                <th class="py-3 px-3 font-semibold">#</th>
+                <th class="py-3 px-3 font-semibold">Name</th>
+                <th class="py-3 px-3 font-semibold">Role</th>
+                <th class="py-3 px-3 font-semibold">Date</th>
+                <th class="py-3 px-3 font-semibold">Time</th>
+                <th class="py-3 px-3 font-semibold">Visit Type</th>
+                <th class="py-3 px-3 font-semibold">Concern</th>
+                <th class="py-3 px-3 font-semibold text-center">Status</th>
+                <th class="py-3 px-3 font-semibold text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="allAppointmentsTable">
+              <tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment requests yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
 </div>
 
 <!-- RESCHEDULE MODAL (NURSE) -->
 <div id="rescheduleModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-        <h3 class="text-lg font-bold text-gray-800 mb-1">
-            <i class="fa-solid fa-calendar-days text-blue-600 mr-2"></i> Reschedule Appointment
-        </h3>
-        <p class="text-sm text-gray-500 mb-4" id="rsInfo"></p>
-        <div class="space-y-3">
-            <div>
-                <label class="block text-gray-600 text-sm font-medium mb-1">Reason for rescheduling <span class="text-red-500">*</span></label>
-                <textarea id="rsReason" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ilagay ang dahilan kung bakit nire-reschedule..."></textarea>
-            </div>
-            <div>
-                <label class="block text-gray-600 text-sm font-medium mb-1">New Date (Monday–Friday only) <span class="text-red-500">*</span></label>
-                <input type="date" id="rsDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="loadRescheduleSlots()">
-            </div>
-            <div>
-                <label class="block text-gray-600 text-sm font-medium mb-1">New Time <span class="text-red-500">*</span></label>
-                <select id="rsTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Select a date first...</option>
-                </select>
-            </div>
-        </div>
-        <div class="flex justify-end gap-2 mt-5">
-            <button onclick="closeRescheduleModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Cancel</button>
-            <button id="rsSubmitBtn" onclick="submitReschedule()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">
-                <i class="fa-solid fa-calendar-check mr-1"></i> Confirm Reschedule
-            </button>
-        </div>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <h3 class="text-lg font-bold text-gray-800 mb-1">
+      <i class="fa-solid fa-calendar-days text-blue-600 mr-2"></i> Reschedule Appointment
+    </h3>
+    <p class="text-sm text-gray-500 mb-4" id="rsInfo"></p>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-gray-600 text-sm font-medium mb-1">Reason for rescheduling <span class="text-red-500">*</span></label>
+        <textarea id="rsReason" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ilagay ang dahilan kung bakit nire-reschedule..."></textarea>
+      </div>
+      <div>
+        <label class="block text-gray-600 text-sm font-medium mb-1">New Date (Monday–Friday only) <span class="text-red-500">*</span></label>
+        <input type="date" id="rsDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="loadRescheduleSlots()">
+      </div>
+      <div>
+        <label class="block text-gray-600 text-sm font-medium mb-1">New Time <span class="text-red-500">*</span></label>
+        <select id="rsTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Select a date first...</option>
+        </select>
+      </div>
     </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button onclick="closeRescheduleModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Cancel</button>
+      <button id="rsSubmitBtn" onclick="submitReschedule()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">
+        <i class="fa-solid fa-calendar-check mr-1"></i> Confirm Reschedule
+      </button>
+    </div>
+  </div>
 </div>
 
-<!-- ? JAVASCRIPT: Sidebar Toggle -->
+<!-- JAVASCRIPT: Sidebar Toggle -->
 <script>
 // ===== USER SIDEBAR =====
 function toggleUserSidebar() {
-  const sidebar = document.getElementById('userSidebar');
-  const overlay = document.getElementById('userOverlay');
-  sidebar.classList.toggle('-translate-x-full');
-  overlay.classList.toggle('hidden');
+    document.getElementById('userSidebar').classList.toggle('-translate-x-full');
+    document.getElementById('userOverlay').classList.toggle('hidden');
 }
-document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('userMenuBtn');
-  if (btn) btn.onclick = toggleUserSidebar;
-});
-
 // ===== NURSE SIDEBAR =====
 function toggleNurseSidebar() {
-  const sidebar = document.getElementById('nurseSidebar');
-  const overlay = document.getElementById('nurseOverlay');
-  sidebar.classList.toggle('-translate-x-full');
-  overlay.classList.toggle('hidden');
+    document.getElementById('nurseSidebar').classList.toggle('-translate-x-full');
+    document.getElementById('nurseOverlay').classList.toggle('hidden');
 }
 document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('nurseMenuBtn');
-  if (btn) btn.onclick = toggleNurseSidebar;
+    const u = document.getElementById('userMenuBtn');
+    if (u) u.onclick = toggleUserSidebar;
+    const n = document.getElementById('nurseMenuBtn');
+    if (n) n.onclick = toggleNurseSidebar;
 });
 </script>
 
@@ -726,10 +758,12 @@ function togglePassword(inputId, eyeId) {
     const eye = document.getElementById(eyeId);
     if (input.type === "password") {
         input.type = "text";
-        eye.classList.remove("fa-eye"); eye.classList.add("fa-eye-slash");
+        eye.classList.remove("fa-eye");
+        eye.classList.add("fa-eye-slash");
     } else {
         input.type = "password";
-        eye.classList.remove("fa-eye-slash"); eye.classList.add("fa-eye");
+        eye.classList.remove("fa-eye-slash");
+        eye.classList.add("fa-eye");
     }
 }
 
@@ -739,7 +773,7 @@ let isSubmittingAppointment = false;
 let aptCache = {};
 let rescheduleId = null;
 
-// ? AVAILABLE TIME SLOTS (Fixed schedule)
+// AVAILABLE TIME SLOTS (Fixed schedule)
 const ALL_TIME_SLOTS = [
     '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
     '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
@@ -771,31 +805,27 @@ function statusInfo(a) {
     return { cls: cls[a.status], text: txt[a.status] };
 }
 
-// === PREVENT WEEKEND DATES ===
+// === PREVENT PAST / WEEKEND DATES ===
 function setDateRestrictions() {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('aptDate').min = today;
 }
 
-// === ? LOAD AVAILABLE TIME SLOTS BASED ON SELECTED DATE ===
+// === LOAD AVAILABLE TIME SLOTS BASED ON SELECTED DATE ===
 async function loadAvailableTimeSlots() {
-    const dateInput = document.getElementById('aptDate');
-    const selectedDate = dateInput.value;
+    const selectedDate = document.getElementById('aptDate').value;
     const container = document.getElementById('timeSlotsContainer');
     selectedTimeSlot = null;
     document.getElementById('aptTime').value = '';
-    
+
     if (!selectedDate) {
         container.innerHTML = '<span class="text-gray-400 text-sm col-span-3">Select a date first...</span>';
         return;
     }
 
-    const dateObj = new Date(selectedDate + 'T00:00:00');
-    const dayOfWeek = dateObj.getDay();
+    const dayOfWeek = new Date(selectedDate + 'T00:00:00').getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
-        container.innerHTML = '<span class="text-red-500 text-sm col-span-3"> Appointments are Monday–Friday only.</span>';
-        document.getElementById('aptTime').value = '';
-        selectedTimeSlot = null;
+        container.innerHTML = '<span class="text-orange-500 text-sm col-span-3">Appointments are Monday–Friday only.</span>';
         return;
     }
 
@@ -804,46 +834,38 @@ async function loadAvailableTimeSlots() {
         const data = await api(`/api/appointments/slots?date=${encodeURIComponent(selectedDate)}`);
         takenTimes = data.taken;
     } catch (error) {
-        container.innerHTML = `<span class="text-red-500 text-sm col-span-3">${error.message}</span>`;
+        container.innerHTML = `<span class="text-red-500 text-sm col-span-3">${esc(error.message)}</span>`;
         return;
     }
 
     container.innerHTML = ALL_TIME_SLOTS.map(time => {
-        const isTaken = takenTimes.includes(time);
-        if (isTaken) {
+        if (takenTimes.includes(time)) {
             return `<div class="time-slot taken border rounded px-2 py-1 text-center text-sm">${time}</div>`;
-        } else {
-            return `<div class="time-slot border border-blue-300 rounded px-2 py-1 text-center text-sm bg-white" onclick="selectTimeSlot('${time}', event)">${time}</div>`;
         }
+        return `<div class="time-slot border border-blue-300 rounded px-2 py-1 text-center text-sm bg-white" onclick="selectTimeSlot('${time}', event)">${time}</div>`;
     }).join('');
 }
 
-// === ? SELECT TIME SLOT ===
+// === SELECT TIME SLOT ===
 function selectTimeSlot(time, clickEvent) {
     selectedTimeSlot = time;
     document.getElementById('aptTime').value = time;
-    
-    document.querySelectorAll('.time-slot').forEach(el => {
-        el.classList.remove('selected');
-        if (!el.classList.contains('taken')) {
-            el.classList.remove('border-blue-600');
-        }
-    });
+    document.querySelectorAll('.time-slot').forEach(el => el.classList.remove('selected'));
     clickEvent.currentTarget.classList.add('selected');
 }
 
-// === SWITCH LOGIN/REGISTER TABS ===
+// === SWITCH LOGIN/REGISTER TABS (itim palagi ang text) ===
 function showAuthTab(tab) {
     const tabLogin = document.getElementById('tabLogin');
     const tabReg = document.getElementById('tabRegister');
     if (tab === 'login') {
-        tabLogin.classList.add('tab-active'); tabReg.classList.remove('tab-active');
-        tabLogin.classList.remove('text-gray-500'); tabReg.classList.add('text-gray-500');
+        tabLogin.classList.add('tab-active');
+        tabReg.classList.remove('tab-active');
         document.getElementById('formLogin').classList.remove('hidden');
         document.getElementById('formRegister').classList.add('hidden');
     } else {
-        tabReg.classList.add('tab-active'); tabLogin.classList.remove('tab-active');
-        tabReg.classList.remove('text-gray-500'); tabLogin.classList.add('text-gray-500');
+        tabReg.classList.add('tab-active');
+        tabLogin.classList.remove('tab-active');
         document.getElementById('formRegister').classList.remove('hidden');
         document.getElementById('formLogin').classList.add('hidden');
     }
@@ -857,23 +879,37 @@ async function registerUser() {
     const pass = document.getElementById('regPass').value;
     const role = document.getElementById('regRole').value;
     const msg = document.getElementById('authMsg');
+    const btn = document.getElementById('registerButton');
 
     if (!name || !email || !pass) {
-        msg.textContent = ' Please fill in all fields!'; msg.className = 'text-orange-500'; return;
+        msg.textContent = 'Please fill in all fields!';
+        msg.className = 'mt-4 text-center font-medium text-orange-600';
+        return;
     }
     if (!email.endsWith('@gmail.com')) {
-        msg.textContent = ' Email must end with @gmail.com'; msg.className = 'text-orange-500'; return;
+        msg.textContent = 'Email must end with @gmail.com';
+        msg.className = 'mt-4 text-center font-medium text-orange-600';
+        return;
     }
     if (pass.length < 6) {
-        msg.textContent = ' Password must be at least 6 characters!'; msg.className = 'text-orange-500'; return;
+        msg.textContent = 'Password must be at least 6 characters!';
+        msg.className = 'mt-4 text-center font-medium text-orange-600';
+        return;
     }
 
+    btn.disabled = true;
+    btn.classList.add('opacity-60', 'cursor-not-allowed');
     try {
         await api('/api/register', { method: 'POST', body: JSON.stringify({ name, email, password: pass, role }) });
-        msg.textContent = ' Account created! Please sign in.'; msg.className = 'text-green-500';
+        msg.textContent = 'Account created! Please sign in.';
+        msg.className = 'mt-4 text-center font-medium text-green-700';
         setTimeout(() => showAuthTab('login'), 1500);
     } catch (error) {
-        msg.textContent = `? ${error.message}`; msg.className = 'text-red-500';
+        msg.textContent = error.message;
+        msg.className = 'mt-4 text-center font-medium text-red-600';
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-60', 'cursor-not-allowed');
     }
 }
 
@@ -885,29 +921,28 @@ async function loginUser() {
     const loginButton = document.getElementById('loginButton');
 
     if (!email || !pass) {
-        msg.textContent = ' Enter your email and password.';
-        msg.className = 'text-orange-500';
+        msg.textContent = 'Enter your email and password.';
+        msg.className = 'mt-4 text-center font-medium text-orange-600';
         return;
     }
     if (!email.endsWith('@gmail.com') && email !== 'nurse@school.ph') {
-        msg.textContent = ' Email must end with @gmail.com';
-        msg.className = 'text-orange-500';
+        msg.textContent = 'Email must end with @gmail.com';
+        msg.className = 'mt-4 text-center font-medium text-orange-600';
         return;
     }
 
     loginButton.disabled = true;
     loginButton.classList.add('opacity-60', 'cursor-not-allowed');
-
     try {
         const data = await api('/api/login', { method: 'POST', body: JSON.stringify({ email, password: pass }) });
         currentUser = data.user;
         openDashboard();
     } catch (error) {
         const message = error.message === 'Failed to fetch'
-            ? '? Cannot connect to the clinic server. Run "py app.py" and open http://127.0.0.1:5050.'
-            : `? ${error.message}`;
+            ? 'Cannot connect to the clinic server. Run "py app.py" and open http://127.0.0.1:5050.'
+            : error.message;
         msg.textContent = message;
-        msg.className = 'text-red-500';
+        msg.className = 'mt-4 text-center font-medium text-red-600';
     } finally {
         loginButton.disabled = false;
         loginButton.classList.remove('opacity-60', 'cursor-not-allowed');
@@ -947,24 +982,25 @@ function openDashboard() {
     } else {
         document.getElementById('userDashboard').classList.remove('hidden');
         document.getElementById('displayName').textContent = currentUser.name;
-        const labels = { Student: ' Student', Teacher: ' Teacher', Staff: ' Staff' };
+        const labels = { Student: 'Student', Teacher: 'Teacher', Staff: 'Staff' };
         document.getElementById('displayRole').textContent = labels[currentUser.role];
         renderMyAppointments();
         setDateRestrictions();
     }
 }
 
-// === ? SUBMIT APPOINTMENT WITH TIME SLOT VALIDATION ===
+// === SUBMIT APPOINTMENT WITH TIME SLOT VALIDATION ===
 async function submitAppointment() {
     if (isSubmittingAppointment) return;
+
     const date = document.getElementById('aptDate').value;
     const time = selectedTimeSlot;
     const type = document.getElementById('aptType').value;
     const reason = document.getElementById('aptReason').value.trim();
 
-    if (!date || !time || !reason) { 
-        alert(' Please select a date, available time slot, and fill in purpose!'); 
-        return; 
+    if (!date || !time || !reason) {
+        alert('Please select a date, available time slot, and fill in purpose!');
+        return;
     }
 
     const submitButton = document.getElementById('submitAppointmentButton');
@@ -973,12 +1009,10 @@ async function submitAppointment() {
     submitButton.classList.add('opacity-60', 'cursor-not-allowed');
 
     try {
-        await api('/api/appointments', {
-            method: 'POST', body: JSON.stringify({ date, time, type, reason })
-        });
-        alert(' Appointment submitted!');
+        await api('/api/appointments', { method: 'POST', body: JSON.stringify({ date, time, type, reason }) });
+        alert('Appointment submitted!');
     } catch (error) {
-        alert(` ${error.message}`);
+        alert(error.message);
         loadAvailableTimeSlots();
         return;
     } finally {
@@ -986,7 +1020,7 @@ async function submitAppointment() {
         submitButton.disabled = false;
         submitButton.classList.remove('opacity-60', 'cursor-not-allowed');
     }
-    
+
     document.getElementById('aptDate').value = '';
     document.getElementById('aptTime').value = '';
     document.getElementById('aptReason').value = '';
@@ -998,16 +1032,20 @@ async function submitAppointment() {
 // === RENDER USER'S APPOINTMENTS ===
 async function renderMyAppointments() {
     let apts;
-    try { apts = (await api('/api/appointments')).appointments; }
-    catch (error) {
-        document.getElementById('myAppointmentsTable').innerHTML = `<tr><td colspan="7" class="py-4 text-center text-red-500">${error.message}</td></tr>`;
+    try {
+        apts = (await api('/api/appointments')).appointments;
+    } catch (error) {
+        document.getElementById('myAppointmentsTable').innerHTML =
+            `<tr><td colspan="7" class="py-4 text-center text-red-500">${esc(error.message)}</td></tr>`;
         return;
     }
+
     const tbody = document.getElementById('myAppointmentsTable');
     if (apts.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-gray-400 italic">No appointments yet.</td></tr>';
         return;
     }
+
     tbody.innerHTML = apts.map((a, i) => {
         const st = statusInfo(a);
         let remarks = '—';
@@ -1019,11 +1057,11 @@ async function renderMyAppointments() {
         }
         return `
         <tr class="border-b hover:bg-blue-50">
-            <td class="py-2 px-2">${i+1}</td>
-            <td class="py-2 px-2">${a.date}</td>
-            <td class="py-2 px-2">${a.time}</td>
-            <td class="py-2 px-2">${a.type}</td>
-            <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
+            <td class="py-2 px-2">${i + 1}</td>
+            <td class="py-2 px-2">${esc(a.date)}</td>
+            <td class="py-2 px-2">${esc(a.time)}</td>
+            <td class="py-2 px-2">${esc(a.type)}</td>
+            <td class="py-2 px-2 max-w-xs truncate">${esc(a.reason)}</td>
             <td class="py-2 px-2"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}">${st.text}</span></td>
             <td class="py-2 px-2 max-w-xs">${remarks}</td>
         </tr>`;
@@ -1048,45 +1086,43 @@ async function updateStats() {
 async function renderAllAppointments() {
     const filterRole = document.getElementById('filterRole').value;
     const filterStatus = document.getElementById('filterStatus').value;
+
     try {
         const data = await api('/api/appointments/all');
         let apts = data.appointments;
         apts.forEach(a => { aptCache[a.id] = a; });
-        // Apply role filter
-        if (filterRole !== 'all') {
-            apts = apts.filter(a => a.userRole === filterRole);
-        }
-        // Apply status filter
-        if (filterStatus !== 'all') {
-            apts = apts.filter(a => a.status === filterStatus);
-        }
+
+        if (filterRole !== 'all') apts = apts.filter(a => a.userRole === filterRole);
+        if (filterStatus !== 'all') apts = apts.filter(a => a.status === filterStatus);
+
         const tbody = document.getElementById('allAppointmentsTable');
         if (apts.length === 0) {
             tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment requests found.</td></tr>';
             return;
         }
+
         tbody.innerHTML = apts.map((a, i) => {
             const st = statusInfo(a);
             return `
             <tr class="border-b hover:bg-blue-50">
                 <td class="py-2 px-2 text-center">${i + 1}</td>
-                <td class="py-2 px-2">${a.userName}</td>
-                <td class="py-2 px-2">${a.userRole}</td>
-                <td class="py-2 px-2">${a.date}</td>
-                <td class="py-2 px-2">${a.time}</td>
-                <td class="py-2 px-2">${a.type}</td>
-                <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
+                <td class="py-2 px-2">${esc(a.userName)}</td>
+                <td class="py-2 px-2">${esc(a.userRole)}</td>
+                <td class="py-2 px-2">${esc(a.date)}</td>
+                <td class="py-2 px-2">${esc(a.time)}</td>
+                <td class="py-2 px-2">${esc(a.type)}</td>
+                <td class="py-2 px-2 max-w-xs truncate">${esc(a.reason)}</td>
                 <td class="py-2 px-2 text-center">
                     <span class="px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}">${st.text}</span>
                 </td>
                 <td class="py-2 px-2 text-center whitespace-nowrap">
                     ${a.status === 'pending' ? `
-                        <button onclick="approveAppointment(${a.id})" class="text-green-600 hover:text-green-800 mr-2" title="Approve">
-                            <i class="fa-solid fa-check"></i>
-                        </button>
-                        <button onclick="openRescheduleModal(${a.id})" class="text-blue-600 hover:text-blue-800 mr-2" title="Reschedule">
-                            <i class="fa-solid fa-calendar-days"></i>
-                        </button>
+                    <button onclick="approveAppointment(${a.id})" class="text-green-600 hover:text-green-800 mr-2" title="Approve">
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                    <button onclick="openRescheduleModal(${a.id})" class="text-blue-600 hover:text-blue-800 mr-2" title="Reschedule">
+                        <i class="fa-solid fa-calendar-days"></i>
+                    </button>
                     ` : ''}
                     <button onclick="printAppointment(${a.id})" class="text-gray-600 hover:text-gray-800 mr-2" title="Print">
                         <i class="fa-solid fa-print"></i>
@@ -1098,22 +1134,22 @@ async function renderAllAppointments() {
             </tr>`;
         }).join('');
     } catch (error) {
-        document.getElementById('allAppointmentsTable').innerHTML = 
-            `<tr><td colspan="9" class="py-8 text-center text-red-500">? ${error.message}</td></tr>`;
+        document.getElementById('allAppointmentsTable').innerHTML =
+            `<tr><td colspan="9" class="py-8 text-center text-red-500">${esc(error.message)}</td></tr>`;
     }
 }
 
 // === APPROVE APPOINTMENT ===
 async function approveAppointment(id) {
-    if (!confirm(' Approve this appointment?')) return;
+    if (!confirm('Approve this appointment?')) return;
     try {
         await api(`/api/appointments/${id}/approve`, { method: 'POST' });
-        alert(' Appointment approved!');
+        alert('Appointment approved!');
         updateStats();
         renderAllAppointments();
         renderHistory(false);
     } catch (error) {
-        alert(`? ${error.message}`);
+        alert(error.message);
     }
 }
 
@@ -1122,8 +1158,7 @@ function openRescheduleModal(id) {
     const a = aptCache[id];
     if (!a) return;
     rescheduleId = id;
-    document.getElementById('rsInfo').textContent =
-        a.userName + ' — current: ' + a.date + ' ' + a.time;
+    document.getElementById('rsInfo').textContent = a.userName + ' — current: ' + a.date + ' ' + a.time;
     document.getElementById('rsReason').value = '';
     document.getElementById('rsDate').value = '';
     document.getElementById('rsDate').min = new Date().toISOString().split('T')[0];
@@ -1166,8 +1201,10 @@ async function submitReschedule() {
     const reason = document.getElementById('rsReason').value.trim();
     const newDate = document.getElementById('rsDate').value;
     const newTime = document.getElementById('rsTime').value;
-    if (!reason) { alert(' Please enter the reason for rescheduling first.'); return; }
-    if (!newDate || !newTime) { alert(' Please select the new date and time.'); return; }
+
+    if (!reason) { alert('Please enter the reason for rescheduling first.'); return; }
+    if (!newDate || !newTime) { alert('Please select the new date and time.'); return; }
+
     const btn = document.getElementById('rsSubmitBtn');
     btn.disabled = true;
     btn.classList.add('opacity-60', 'cursor-not-allowed');
@@ -1176,13 +1213,13 @@ async function submitReschedule() {
             method: 'POST',
             body: JSON.stringify({ date: newDate, time: newTime, reason })
         });
-        alert(' Appointment rescheduled.');
+        alert('Appointment rescheduled.');
         closeRescheduleModal();
         updateStats();
         renderAllAppointments();
         renderHistory(false);
     } catch (error) {
-        alert(` ${error.message}`);
+        alert(error.message);
         loadRescheduleSlots();
     } finally {
         btn.disabled = false;
@@ -1192,23 +1229,23 @@ async function submitReschedule() {
 
 // === DELETE APPOINTMENT ===
 async function deleteAppointment(id) {
-    if (!confirm(' Delete this appointment permanently? This cannot be undone.')) return;
+    if (!confirm('Delete this appointment permanently? This cannot be undone.')) return;
     try {
         await api(`/api/appointments/${id}`, { method: 'DELETE' });
         delete aptCache[id];
-        alert(' Appointment deleted.');
+        alert('Appointment deleted.');
         updateStats();
         renderAllAppointments();
         renderHistory(false);
     } catch (error) {
-        alert(` ${error.message}`);
+        alert(error.message);
     }
 }
 
 // === PRINT APPOINTMENT DETAILS ===
 function printAppointment(id) {
     const a = aptCache[id];
-    if (!a) { alert(' Appointment details not found.'); return; }
+    if (!a) { alert('Appointment details not found.'); return; }
     const st = statusInfo(a);
     const rows = [
         ['Patient Name', a.userName],
@@ -1226,11 +1263,10 @@ function printAppointment(id) {
     if (a.status === 'rejected' && a.rejectionReason) {
         rows.push(['Rejection Reason', a.rejectionReason]);
     }
-    const body = rows.map(r =>
-        '<tr><th>' + esc(r[0]) + '</th><td>' + esc(r[1]) + '</td></tr>'
-    ).join('');
+    const body = rows.map(r => '<tr><th>' + esc(r[0]) + '</th><td>' + esc(r[1]) + '</td></tr>').join('');
+
     const w = window.open('', '_blank', 'width=800,height=700');
-    if (!w) { alert(' Please allow pop-ups to print.'); return; }
+    if (!w) { alert('Please allow pop-ups to print.'); return; }
     w.document.write(
         '<html><head><title>Appointment #' + a.id + '</title>' +
         '<style>' +
@@ -1261,28 +1297,30 @@ async function renderHistory(oldestFirst = false) {
         const data = await api('/api/appointments/all');
         let apts = data.appointments;
         apts.forEach(a => { aptCache[a.id] = a; });
-        // Sort by date/time
+
         apts.sort((a, b) => {
             const dateA = new Date(`${a.date}T${a.time}`);
             const dateB = new Date(`${b.date}T${b.time}`);
             return oldestFirst ? dateA - dateB : dateB - dateA;
         });
+
         const tbody = document.getElementById('historyTable');
         if (apts.length === 0) {
             tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400 italic">No appointment history yet.</td></tr>';
             return;
         }
+
         tbody.innerHTML = apts.map((a, i) => {
             const st = statusInfo(a);
             return `
             <tr class="border-b hover:bg-blue-50">
                 <td class="py-2 px-2 text-center">${i + 1}</td>
-                <td class="py-2 px-2">${a.userName}</td>
-                <td class="py-2 px-2">${a.userRole}</td>
-                <td class="py-2 px-2">${a.date}</td>
-                <td class="py-2 px-2">${a.time}</td>
-                <td class="py-2 px-2">${a.type}</td>
-                <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
+                <td class="py-2 px-2">${esc(a.userName)}</td>
+                <td class="py-2 px-2">${esc(a.userRole)}</td>
+                <td class="py-2 px-2">${esc(a.date)}</td>
+                <td class="py-2 px-2">${esc(a.time)}</td>
+                <td class="py-2 px-2">${esc(a.type)}</td>
+                <td class="py-2 px-2 max-w-xs truncate">${esc(a.reason)}</td>
                 <td class="py-2 px-2 text-center">
                     <span class="px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}">${st.text}</span>
                 </td>
@@ -1297,8 +1335,8 @@ async function renderHistory(oldestFirst = false) {
             </tr>`;
         }).join('');
     } catch (error) {
-        document.getElementById('historyTable').innerHTML = 
-            `<tr><td colspan="9" class="py-8 text-center text-red-500">? ${error.message}</td></tr>`;
+        document.getElementById('historyTable').innerHTML =
+            `<tr><td colspan="9" class="py-8 text-center text-red-500">${esc(error.message)}</td></tr>`;
     }
 }
 
@@ -1307,29 +1345,28 @@ async function searchPatientHistory() {
     const name = document.getElementById('searchPatientName').value.trim().toLowerCase();
     const resultDiv = document.getElementById('patientHistoryResult');
     const tableBody = document.getElementById('patientHistoryTable');
-    if (!name) {
-        alert(' Please enter a name to search.');
-        return;
-    }
+
+    if (!name) { alert('Please enter a name to search.'); return; }
+
     try {
         const data = await api('/api/appointments/all');
-        const matches = data.appointments.filter(a => 
-            a.userName.toLowerCase().includes(name)
-        );
+        const matches = data.appointments.filter(a => a.userName.toLowerCase().includes(name));
         resultDiv.classList.remove('hidden');
+
         if (matches.length === 0) {
             tableBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-400 italic">No records found for that name.</td></tr>';
             return;
         }
+
         tableBody.innerHTML = matches.map((a, i) => {
             const st = statusInfo(a);
             return `
             <tr class="border-b hover:bg-blue-50">
                 <td class="py-2 px-2">${i + 1}</td>
-                <td class="py-2 px-2">${a.date}</td>
-                <td class="py-2 px-2">${a.time}</td>
-                <td class="py-2 px-2">${a.type}</td>
-                <td class="py-2 px-2 max-w-xs truncate">${a.reason}</td>
+                <td class="py-2 px-2">${esc(a.date)}</td>
+                <td class="py-2 px-2">${esc(a.time)}</td>
+                <td class="py-2 px-2">${esc(a.type)}</td>
+                <td class="py-2 px-2 max-w-xs truncate">${esc(a.reason)}</td>
                 <td class="py-2 px-2">
                     <span class="px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}">${st.text}</span>
                 </td>
@@ -1337,7 +1374,7 @@ async function searchPatientHistory() {
         }).join('');
     } catch (error) {
         resultDiv.classList.remove('hidden');
-        tableBody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">? ${error.message}</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">${esc(error.message)}</td></tr>`;
     }
 }
 
@@ -1350,51 +1387,75 @@ async function logoutSystem() {
         console.warn('Logout API error:', error);
     }
     currentUser = null;
-    // Reset all views
     document.getElementById('authSection').classList.remove('hidden');
     document.getElementById('userDashboard').classList.add('hidden');
     document.getElementById('nurseDashboard').classList.add('hidden');
-    // Reset forms
     document.getElementById('loginEmail').value = '';
     document.getElementById('loginPass').value = '';
     document.getElementById('authMsg').textContent = '';
     showAuthTab('login');
 }
 
-// === INITIALIZE ON PAGE LOAD ===
+// === INITIALIZE ON PAGE LOAD (+ Enter key support sa forms) ===
 document.addEventListener('DOMContentLoaded', () => {
     setDateRestrictions();
+
+    ['loginEmail', 'loginPass'].forEach(id => {
+        document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') loginUser(); });
+    });
+    ['regName', 'regEmail', 'regPass'].forEach(id => {
+        document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') registerUser(); });
+    });
+    document.getElementById('searchPatientName').addEventListener('keydown', e => {
+        if (e.key === 'Enter') searchPatientHistory();
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeRescheduleModal();
+    });
 });
 </script>
+</body>
+</html>
 """
-    return HTML_CONTENT
+
+
+@app.get("/")
+def index():
+    return Response(HTML_CONTENT, mimetype="text/html")
+
 
 # === API ROUTES ===
 @app.post("/api/register")
 def register():
-    data = request.get_json()
-    name = data.get("name", "").strip()
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "")
-    role = data.get("role", "")
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    role = data.get("role") or ""
+
     if not all([name, email, password, role]):
         return jsonify(error="All fields are required."), 400
     if not email.endswith("@gmail.com"):
         return jsonify(error="Email must end with @gmail.com."), 400
+    if len(password) < 6:
+        return jsonify(error="Password must be at least 6 characters."), 400
     if role not in ("Student", "Teacher", "Staff"):
         return jsonify(error="Invalid role selected."), 400
+
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         cur.execute("SELECT id FROM users WHERE email = %s", (email,))
         if cur.fetchone():
             return jsonify(error="Email already registered."), 409
+
         password_hash = generate_password_hash(password)
         cur.execute(
             "INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)",
-            (name, email, password_hash, role)
+            (name, email, password_hash, role),
         )
         conn.commit()
         return jsonify(message="Account created successfully!"), 201
@@ -1403,41 +1464,44 @@ def register():
         return jsonify(error=f"Registration failed: {str(e)}"), 500
     finally:
         cur.close()
-        conn.close()
+
 
 @app.post("/api/login")
 def login():
-    data = request.get_json()
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "")
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT id, name, email, password_hash, role FROM users WHERE email = %s", (email,))
+        cur.execute(
+            "SELECT id, name, email, password_hash, role FROM users WHERE email = %s", (email,)
+        )
         row = cur.fetchone()
         if not row:
             return jsonify(error="Email not found."), 401
         if not check_password_hash(row[3], password):
             return jsonify(error="Incorrect password."), 401
+
         session["user_id"] = row[0]
         return jsonify(user={
-            "id": row[0],
-            "name": row[1],
-            "email": row[2],
-            "role": row[4]
+            "id": row[0], "name": row[1], "email": row[2], "role": row[4]
         }), 200
     except Exception as e:
         return jsonify(error=f"Login failed: {str(e)}"), 500
     finally:
         cur.close()
-        conn.close()
+
 
 @app.post("/api/logout")
 def logout():
     session.pop("user_id", None)
     return jsonify(message="Logged out successfully."), 200
+
 
 @app.get("/api/appointments/slots")
 @login_required
@@ -1445,35 +1509,52 @@ def get_taken_slots():
     selected_date = request.args.get("date")
     if not selected_date:
         return jsonify(error="Date is required."), 400
+
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT time FROM appointments WHERE date = %s AND status != 'rejected'", (selected_date,))
+        cur.execute(
+            "SELECT time FROM appointments WHERE date = %s AND status != 'rejected'",
+            (selected_date,),
+        )
         taken = [row[0] for row in cur.fetchall()]
         return jsonify(taken=taken), 200
     except Exception as e:
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
-        conn.close()
+
 
 @app.post("/api/appointments")
 @login_required
 def create_appointment():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     date = data.get("date")
     time = data.get("time")
     apt_type = data.get("type")
-    reason = data.get("reason")
+    reason = (data.get("reason") or "").strip()
+
     if not all([date, time, apt_type, reason]):
         return jsonify(error="All fields are required."), 400
+
+    try:
+        parsed = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        return jsonify(error="Invalid date format."), 400
+    if parsed.weekday() >= 5:
+        return jsonify(error="Appointments are Monday–Friday only."), 400
+    if time not in TIME_SLOTS:
+        return jsonify(error="Invalid time slot."), 400
+
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         cur.execute("""
             INSERT INTO appointments (user_id, date, time, type, reason)
             VALUES (%s, %s, %s, %s, %s)
@@ -1482,12 +1563,12 @@ def create_appointment():
         return jsonify(message="Appointment submitted successfully!"), 201
     except Exception as e:
         conn.rollback()
-        if "unique constraint" in str(e).lower():
+        if "unique constraint" in str(e).lower() or "duplicate key" in str(e).lower():
             return jsonify(error="This time slot has already been booked."), 409
         return jsonify(error=f"Failed to create appointment: {str(e)}"), 500
     finally:
         cur.close()
-        conn.close()
+
 
 @app.get("/api/appointments")
 @login_required
@@ -1495,39 +1576,23 @@ def get_my_appointments():
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         cur.execute("""
-            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status, a.rejection_reason,
-                   a.reschedule_reason, a.old_date, a.old_time
+            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status,
+                   a.rejection_reason, a.reschedule_reason, a.old_date, a.old_time
             FROM appointments a
             JOIN users u ON a.user_id = u.id
             WHERE a.user_id = %s
             ORDER BY a.date DESC, a.time DESC
         """, (g.user["id"],))
-        appointments = [
-            {
-                "id": row[0],
-                "userName": row[1],
-                "userRole": row[2],
-                "date": row[3],
-                "time": row[4],
-                "type": row[5],
-                "reason": row[6],
-                "status": row[7],
-                "rejectionReason": row[8],
-                "rescheduleReason": row[9],
-                "oldDate": row[10],
-                "oldTime": row[11]
-            }
-            for row in cur.fetchall()
-        ]
-        return jsonify(appointments=appointments), 200
+        return jsonify(appointments=appointment_rows_to_list(cur.fetchall())), 200
     except Exception as e:
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
-        conn.close()
+
 
 @app.get("/api/appointments/all")
 @nurse_required
@@ -1535,38 +1600,22 @@ def get_all_appointments():
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         cur.execute("""
-            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status, a.rejection_reason,
-                   a.reschedule_reason, a.old_date, a.old_time
+            SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status,
+                   a.rejection_reason, a.reschedule_reason, a.old_date, a.old_time
             FROM appointments a
             JOIN users u ON a.user_id = u.id
             ORDER BY a.created_at DESC
         """)
-        appointments = [
-            {
-                "id": row[0],
-                "userName": row[1],
-                "userRole": row[2],
-                "date": row[3],
-                "time": row[4],
-                "type": row[5],
-                "reason": row[6],
-                "status": row[7],
-                "rejectionReason": row[8],
-                "rescheduleReason": row[9],
-                "oldDate": row[10],
-                "oldTime": row[11]
-            }
-            for row in cur.fetchall()
-        ]
-        return jsonify(appointments=appointments), 200
+        return jsonify(appointments=appointment_rows_to_list(cur.fetchall())), 200
     except Exception as e:
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
-        conn.close()
+
 
 @app.post("/api/appointments/<int:apt_id>/approve")
 @nurse_required
@@ -1574,8 +1623,9 @@ def approve(apt_id):
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         cur.execute("UPDATE appointments SET status = 'approved' WHERE id = %s", (apt_id,))
         if cur.rowcount == 0:
             return jsonify(error="Appointment not found."), 404
@@ -1586,20 +1636,22 @@ def approve(apt_id):
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
-        conn.close()
+
 
 @app.post("/api/appointments/<int:apt_id>/reject")
 @nurse_required
 def reject(apt_id):
     data = request.get_json(silent=True) or {}
-    rejection_reason = data.get("rejectionReason", "").strip()
+    rejection_reason = (data.get("rejectionReason") or "").strip()
     if not rejection_reason:
         return jsonify(error="A rejection reason is required."), 400
+
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         cur.execute(
             "UPDATE appointments SET status = 'rejected', rejection_reason = %s WHERE id = %s",
             (rejection_reason, apt_id),
@@ -1613,9 +1665,9 @@ def reject(apt_id):
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
-        conn.close()
 
-# === NEW: RESCHEDULE (nurse sets new date/time + required reason) ===
+
+# === RESCHEDULE (nurse sets new date/time + required reason) ===
 @app.post("/api/appointments/<int:apt_id>/reschedule")
 @nurse_required
 def reschedule(apt_id):
@@ -1623,10 +1675,12 @@ def reschedule(apt_id):
     new_date = (data.get("date") or "").strip()
     new_time = (data.get("time") or "").strip()
     reason = (data.get("reason") or "").strip()
+
     if not reason:
         return jsonify(error="A reschedule reason is required."), 400
     if not new_date or not new_time:
         return jsonify(error="New date and time are required."), 400
+
     try:
         parsed = datetime.strptime(new_date, "%Y-%m-%d")
     except ValueError:
@@ -1635,15 +1689,18 @@ def reschedule(apt_id):
         return jsonify(error="Appointments are Monday–Friday only."), 400
     if new_time not in TIME_SLOTS:
         return jsonify(error="Invalid time slot."), 400
+
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         cur.execute("SELECT date, time FROM appointments WHERE id = %s", (apt_id,))
         current = cur.fetchone()
         if current is None:
             return jsonify(error="Appointment not found."), 404
+
         cur.execute("""
             UPDATE appointments
             SET old_date = %s, old_time = %s,
@@ -1657,22 +1714,23 @@ def reschedule(apt_id):
         return jsonify(message="Appointment rescheduled."), 200
     except Exception as e:
         conn.rollback()
-        if "unique constraint" in str(e).lower():
+        if "unique constraint" in str(e).lower() or "duplicate key" in str(e).lower():
             return jsonify(error="That time slot has already been booked."), 409
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
-        conn.close()
 
-# === NEW: DELETE APPOINTMENT (nurse only) ===
+
+# === DELETE APPOINTMENT (nurse only) ===
 @app.delete("/api/appointments/<int:apt_id>")
 @nurse_required
 def delete_appointment(apt_id):
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         cur.execute("DELETE FROM appointments WHERE id = %s", (apt_id,))
         if cur.rowcount == 0:
             return jsonify(error="Appointment not found."), 404
@@ -1683,7 +1741,7 @@ def delete_appointment(apt_id):
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
-        conn.close()
+
 
 @app.get("/api/stats")
 @nurse_required
@@ -1691,8 +1749,9 @@ def get_stats():
     conn = get_db()
     if not conn:
         return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM appointments")
         total = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM appointments WHERE created_at >= NOW() - INTERVAL '1 day'")
@@ -1708,13 +1767,13 @@ def get_stats():
             "newToday": new_today,
             "pending": pending,
             "approved": approved,
-            "rejected": rejected
+            "rejected": rejected,
         }), 200
     except Exception as e:
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
-        conn.close()
+
 
 # === RUN SERVER ===
 if __name__ == "__main__":

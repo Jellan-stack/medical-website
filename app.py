@@ -261,7 +261,7 @@ def index():
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-black-50 min-h-screen">
 
 <!--  LOGIN PAGE -->
 <div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4">

@@ -310,23 +310,23 @@ def index():
         <div id="formRegister" class="hidden">
             <div class="space-y-4">
                 <div>
-                    <label class="block text-gray-700 font-medium mb-1">Full Name</label>
-                    <input type="text" id="regName" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Juan Dela Cruz">
+                    <label class="block text-black-700 font-medium mb-1">Full Name</label>
+                    <input type="text" id="regName" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Juan Dela Cruz">
                 </div>
                 <div>
-                    <label class="block text-gray-700 font-medium mb-1">Email</label>
-                    <input type="email" id="regEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="your@gmail.com">
+                    <label class="block text-black-700 font-medium mb-1">Email</label>
+                    <input type="email" id="regEmail" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="your@gmail.com">
                 </div>
                 <div>
-                    <label class="block text-gray-700 font-medium mb-1">Password</label>
+                    <label class="block text-black-700 font-medium mb-1">Password</label>
                     <div class="password-wrapper">
-                        <input type="password" id="regPass" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="At least 6 characters">
+                        <input type="password" id="regPass" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="At least 6 characters">
                         <i class="fa-solid fa-eye eye-icon" id="eyeReg" onclick="togglePassword('regPass', 'eyeReg')"></i>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-gray-700 font-medium mb-1">You are a...</label>
-                    <select id="regRole" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <label class="block text-black-700 font-medium mb-1">You are a...</label>
+                    <select id="regRole" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
                         <option value="Student">  Student</option>
                         <option value="Teacher">  Teacher</option>
                         <option value="Staff">  Staff</option>
@@ -374,11 +374,11 @@ def index():
     <!-- Overlay -->
     <div id="userOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleUserSidebar()"></div>
 
-    <main class="flex-1 p-4 md:p-6 bg-gray-50">
+    <main class="flex-1 p-4 md:p-6 bg-black-50">
         <div class="dashboard-card p-4 mb-6 flex justify-between items-center fade-in">
             <div>
-                <h2 class="text-xl font-bold text-gray-800">Welcome, <span id="displayName"></span>!</h2>
-                <p class="text-gray-500 text-sm" id="displayRole"></p>
+                <h2 class="text-xl font-bold text-black-800">Welcome, <span id="displayName"></span>!</h2>
+                <p class="text-black-500 text-sm" id="displayRole"></p>
             </div>
             <button onclick="logoutSystem()" class="md:hidden bg-red-500 text-white px-3 py-2 rounded-lg text-sm">
                 <i class="fa-solid fa-right-from-bracket"></i>
@@ -386,23 +386,23 @@ def index():
         </div>
 
         <div class="dashboard-card p-6 mb-6 fade-in">
-            <h3 class="text-lg font-bold text-gray-800 mb-4"> Book an Appointment</h3>
+            <h3 class="text-lg font-bold text-black-800 mb-4"> Book an Appointment</h3>
             <div class="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label class="block text-gray-600 text-sm font-medium mb-1">Select Date (Monday–Friday only)</label>
-                    <input type="date" id="aptDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="loadAvailableTimeSlots()">
+                    <label class="block text-black-600 text-sm font-medium mb-1">Select Date (Monday–Friday only)</label>
+                    <input type="date" id="aptDate" class="w-full px-3 py-2 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="loadAvailableTimeSlots()">
                 </div>
                 <div>
-                    <label class="block text-gray-600 text-sm font-medium mb-1">Available Time Slot</label>
+                    <label class="block text-black-600 text-sm font-medium mb-1">Available Time Slot</label>
                     <input type="hidden" id="aptTime">
                     <div id="timeSlotsContainer" class="grid grid-cols-3 gap-2">
-                        <span class="text-gray-400 text-sm col-span-3">Select a date first...</span>
+                        <span class="text-black-400 text-sm col-span-3">Select a date first...</span>
                     </div>
                 </div>
             </div>
             <div class="mb-4">
-                <label class="block text-gray-600 text-sm font-medium mb-1">Visit Type</label>
-                <select id="aptType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <label class="block text-black-600 text-sm font-medium mb-1">Visit Type</label>
+                <select id="aptType" class="w-full px-3 py-2 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option>General Consultation</option>
                     <option>First Aid / Minor Injury</option>
                     <option>Headache</option>
@@ -413,8 +413,8 @@ def index():
                 </select>
             </div>
             <div>
-                <label class="block text-gray-600 text-sm font-medium mb-1">Purpose / Symptoms</label>
-                <textarea id="aptReason" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Describe your symptoms..."></textarea>
+                <label class="block text-black-600 text-sm font-medium mb-1">Purpose / Symptoms</label>
+                <textarea id="aptReason" rows="3" class="w-full px-3 py-2 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Describe your symptoms..."></textarea>
             </div>
             <button id="submitAppointmentButton" onclick="submitAppointment()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold">
                 <i class="fa-solid fa-paper-plane mr-2"></i> Submit Request

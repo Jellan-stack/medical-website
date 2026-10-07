@@ -273,15 +273,15 @@ def index():
                 class="w-20 h-20 object-contain mx-auto mb-3 bg-transparent p-0 border-0"
                 alt="SLSU Logo"
             >
-            <h1 class="text-2xl font-bold text-gray-800">Clinic Appointment System</h1>
-            <p class="text-gray-500">School Clinic Appointment System</p>
+            <h1 class="text-2xl font-bold text-black-800">Clinic Appointment System</h1>
+            <p class="text-black-500">School Clinic Appointment System</p>
         </div>
 
-        <div class="flex mb-6 border-b border-gray-200">
+        <div class="flex mb-6 border-b border-black-200">
             <button id="tabLogin" class="flex-1 py-3 text-center tab-active" onclick="showAuthTab('login')">
                 <i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In
             </button>
-            <button id="tabRegister" class="flex-1 py-3 text-center text-gray-500" onclick="showAuthTab('register')">
+            <button id="tabRegister" class="flex-1 py-3 text-center text-black-500" onclick="showAuthTab('register')">
                 <i class="fa-solid fa-user-plus mr-2"></i> Create Account
             </button>
         </div>
@@ -290,13 +290,13 @@ def index():
         <div id="formLogin">
             <div class="space-y-4">
                 <div>
-                    <label class="block text-gray-700 font-medium mb-1">Email</label>
-                    <input type="email" id="loginEmail" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your@gmail.com">
+                    <label class="block text-black-700 font-medium mb-1">Email</label>
+                    <input type="email" id="loginEmail" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your@gmail.com">
                 </div>
                 <div>
-                    <label class="block text-gray-700 font-medium mb-1">Password</label>
+                    <label class="block text-black-700 font-medium mb-1">Password</label>
                     <div class="password-wrapper">
-                        <input type="password" id="loginPass" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="At least 6 characters">
+                        <input type="password" id="loginPass" class="w-full px-4 py-2.5 border border-black-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="At least 6 characters">
                         <i class="fa-solid fa-eye eye-icon" id="eyeLogin" onclick="togglePassword('loginPass', 'eyeLogin')"></i>
                     </div>
                 </div>

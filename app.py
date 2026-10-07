@@ -5,6 +5,7 @@ from pathlib import Path
 import psycopg2  # ? Ginamit ang tamang package
 from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
+
 # === DATABASE CONFIGURATION ===
 DATABASE_URL = os.environ.get("DATABASE_URL")
 BASE_DIR = Path(__file__).resolve().parent
@@ -14,6 +15,7 @@ app.config["SECRET_KEY"] = os.environ.get(
 )
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
 # ? IISA LANG NG GET_DB FUNCTION — PARA SA POSTGRESQL
 def get_db():
     if "db" not in g:
@@ -24,15 +26,18 @@ def get_db():
             print(f"? DB Connection Error: {e}")
             return None
     return g.db
+
 @app.teardown_appcontext
 def close_db(_error):
     db = g.pop("db", None)
     if db is not None:
         db.close()
+
 TIME_SLOTS = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
 ]
+
 # === DATABASE INITIALIZATION — POSTGRESQL SYNTAX ===
 def init_db():
     conn = get_db()
@@ -84,6 +89,7 @@ def init_db():
     cur.close()
     conn.close()
     print("? Database ready!")
+
 # === AUTH HELPERS ===
 def current_user():
     user_id = session.get("user_id")
@@ -99,6 +105,7 @@ def current_user():
     if not user:
         return None
     return {"id": user[0], "name": user[1], "email": user[2], "role": user[3]}
+
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -108,6 +115,7 @@ def login_required(view):
         g.user = user
         return view(*args, **kwargs)
     return wrapped
+
 def nurse_required(view):
     @wraps(view)
     @login_required
@@ -116,8 +124,10 @@ def nurse_required(view):
             return jsonify(error="Nurse access required."), 403
         return view(*args, **kwargs)
     return wrapped
+
 def user_dict(user):
     return {"id": user["id"], "name": user["name"], "email": user["email"], "role": user["role"]}
+
 def appointment_dict(row):
     return {
         "id": row[0],
@@ -130,6 +140,7 @@ def appointment_dict(row):
         "reason": row[7],
         "status": row[8],
     }
+
 # === HTML CONTENT (HINDI BINAGO) ===
 @app.get("/")
 def index():
@@ -251,6 +262,7 @@ def index():
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
+
 <!--  LOGIN PAGE -->
 <div id="authSection" class="school-bg flex items-center justify-center min-h-screen p-4">
     <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
@@ -264,6 +276,7 @@ def index():
             <h1 class="text-2xl font-bold text-gray-800">Clinic Appointment System</h1>
             <p class="text-gray-500">School Clinic Appointment System</p>
         </div>
+
         <div class="flex mb-6 border-b border-gray-200">
             <button id="tabLogin" class="flex-1 py-3 text-center tab-active" onclick="showAuthTab('login')">
                 <i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In
@@ -272,6 +285,7 @@ def index():
                 <i class="fa-solid fa-user-plus mr-2"></i> Create Account
             </button>
         </div>
+
         <!-- LOGIN FORM -->
         <div id="formLogin">
             <div class="space-y-4">
@@ -291,6 +305,7 @@ def index():
                 </button>
             </div>
         </div>
+
         <!-- REGISTER FORM -->
         <div id="formRegister" class="hidden">
             <div class="space-y-4">
@@ -322,16 +337,19 @@ def index():
                 </button>
             </div>
         </div>
+
         <p id="authMsg" class="mt-4 text-center font-medium"></p>
     </div>
 </div>
+
 <!--  USER DASHBOARD -->
 <div id="userDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
     <!-- Mobile Menu Button -->
     <div class="md:hidden bg-blue-900 text-white p-3 flex justify-between items-center">
         <span class="font-bold">Clinic</span>
-        <button id="userMenuBtn" class="text-xl"></button>
+        <button id="userMenuBtn" class="text-xl"><i class="fa-solid fa-bars"></i></button>
     </div>
+
     <!-- Sidebar -->
     <aside id="userSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
         <div class="p-4">
@@ -352,8 +370,10 @@ def index():
             </nav>
         </div>
     </aside>
+
     <!-- Overlay -->
     <div id="userOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleUserSidebar()"></div>
+
     <main class="flex-1 p-4 md:p-6 bg-gray-50">
         <div class="dashboard-card p-4 mb-6 flex justify-between items-center fade-in">
             <div>
@@ -364,6 +384,7 @@ def index():
                 <i class="fa-solid fa-right-from-bracket"></i>
             </button>
         </div>
+
         <div class="dashboard-card p-6 mb-6 fade-in">
             <h3 class="text-lg font-bold text-gray-800 mb-4"> Book an Appointment</h3>
             <div class="grid md:grid-cols-2 gap-4 mb-4">
@@ -399,6 +420,7 @@ def index():
                 <i class="fa-solid fa-paper-plane mr-2"></i> Submit Request
             </button>
         </div>
+
         <div class="dashboard-card p-6 fade-in">
             <h3 class="text-lg font-bold text-gray-800 mb-4"> My Appointments</h3>
             <div class="overflow-x-auto">
@@ -422,6 +444,7 @@ def index():
         </div>
     </main>
 </div>
+
 <!--  NURSE DASHBOARD -->
 <div id="nurseDashboard" class="hidden min-h-screen flex flex-col md:flex-row">
     <!-- Mobile Menu Button -->
@@ -430,8 +453,9 @@ def index():
             <span class="font-bold">NURSE PANEL</span>
             <p class="text-xs text-blue-200">Clinic Management</p>
         </div>
-        <button id="nurseMenuBtn" class="text-xl"></button>
+        <button id="nurseMenuBtn" class="text-xl"><i class="fa-solid fa-bars"></i></button>
     </div>
+
     <!-- Sidebar -->
     <aside id="nurseSidebar" class="w-64 bg-blue-900 text-white fixed md:sticky top-0 left-0 h-screen z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
         <div class="p-4">
@@ -458,8 +482,10 @@ def index():
             </nav>
         </div>
     </aside>
+
     <!-- Overlay -->
     <div id="nurseOverlay" class="md:hidden fixed inset-0 bg-black/50 hidden z-30" onclick="toggleNurseSidebar()"></div>
+
     <main class="flex-1 p-4 md:p-6 bg-gray-50">
         <!-- DASHBOARD VIEW -->
         <div id="nurseViewDashboard" class="fade-in">
@@ -483,6 +509,7 @@ def index():
                     </button>
                 </div>
             </div>
+
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div class="stat-card bg-blue-500 text-white p-4">
                     <div class="flex items-center justify-between">
@@ -509,6 +536,7 @@ def index():
                     </div>
                 </div>
             </div>
+
             <div class="dashboard-card p-4 mb-6">
     <h3 class="text-lg font-bold text-gray-800 mb-3"> Search Patient History</h3>
     
@@ -541,6 +569,7 @@ def index():
                 </div>
             </div>
         </div>
+
       <!-- APPOINTMENT HISTORY VIEW -->
 <div id="nurseViewHistory" class="hidden fade-in">
     <div class="dashboard-card p-4 sm:p-6">
@@ -559,6 +588,7 @@ def index():
                 </button>
             </div>
         </div>
+
         <!--  Pinakaayos na Scrollable Table Container -->
         <div class="w-full overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
             <table class="w-full text-sm min-w-max">
@@ -584,6 +614,7 @@ def index():
         </div>
     </div>
 </div>
+
         <!-- ALL APPOINTMENTS VIEW -->
         <div id="nurseViewAppointments" class="hidden fade-in">
             <div class="dashboard-card p-6">
@@ -628,6 +659,7 @@ def index():
         </div>
     </main>
 </div>
+
 <!-- RESCHEDULE MODAL (NURSE) -->
 <div id="rescheduleModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
@@ -659,6 +691,7 @@ def index():
         </div>
     </div>
 </div>
+
 <!-- ? JAVASCRIPT: Sidebar Toggle -->
 <script>
 // ===== USER SIDEBAR =====
@@ -672,6 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('userMenuBtn');
   if (btn) btn.onclick = toggleUserSidebar;
 });
+
 // ===== NURSE SIDEBAR =====
 function toggleNurseSidebar() {
   const sidebar = document.getElementById('nurseSidebar');
@@ -684,6 +718,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btn) btn.onclick = toggleNurseSidebar;
 });
 </script>
+
 <script>
 // === PASSWORD TOGGLE ===
 function togglePassword(inputId, eyeId) {
@@ -697,16 +732,19 @@ function togglePassword(inputId, eyeId) {
         eye.classList.remove("fa-eye-slash"); eye.classList.add("fa-eye");
     }
 }
+
 let currentUser = null;
 let selectedTimeSlot = null;
 let isSubmittingAppointment = false;
 let aptCache = {};
 let rescheduleId = null;
+
 // ? AVAILABLE TIME SLOTS (Fixed schedule)
 const ALL_TIME_SLOTS = [
     '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
     '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
 ];
+
 async function api(url, options = {}) {
     const response = await fetch(url, {
         headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
@@ -716,12 +754,14 @@ async function api(url, options = {}) {
     if (!response.ok) throw new Error(data.error || 'Something went wrong.');
     return data;
 }
+
 // === HELPERS (escape, status label) ===
 function esc(s) {
     return String(s === null || s === undefined ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
 function statusInfo(a) {
     if (a.status === 'approved' && a.rescheduleReason) {
         return { cls: 'status-rescheduled', text: 'Rescheduled' };
@@ -730,11 +770,13 @@ function statusInfo(a) {
     const txt = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
     return { cls: cls[a.status], text: txt[a.status] };
 }
+
 // === PREVENT WEEKEND DATES ===
 function setDateRestrictions() {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('aptDate').min = today;
 }
+
 // === ? LOAD AVAILABLE TIME SLOTS BASED ON SELECTED DATE ===
 async function loadAvailableTimeSlots() {
     const dateInput = document.getElementById('aptDate');
@@ -747,6 +789,7 @@ async function loadAvailableTimeSlots() {
         container.innerHTML = '<span class="text-gray-400 text-sm col-span-3">Select a date first...</span>';
         return;
     }
+
     const dateObj = new Date(selectedDate + 'T00:00:00');
     const dayOfWeek = dateObj.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
@@ -755,6 +798,7 @@ async function loadAvailableTimeSlots() {
         selectedTimeSlot = null;
         return;
     }
+
     let takenTimes;
     try {
         const data = await api(`/api/appointments/slots?date=${encodeURIComponent(selectedDate)}`);
@@ -763,6 +807,7 @@ async function loadAvailableTimeSlots() {
         container.innerHTML = `<span class="text-red-500 text-sm col-span-3">${error.message}</span>`;
         return;
     }
+
     container.innerHTML = ALL_TIME_SLOTS.map(time => {
         const isTaken = takenTimes.includes(time);
         if (isTaken) {
@@ -772,6 +817,7 @@ async function loadAvailableTimeSlots() {
         }
     }).join('');
 }
+
 // === ? SELECT TIME SLOT ===
 function selectTimeSlot(time, clickEvent) {
     selectedTimeSlot = time;
@@ -785,6 +831,7 @@ function selectTimeSlot(time, clickEvent) {
     });
     clickEvent.currentTarget.classList.add('selected');
 }
+
 // === SWITCH LOGIN/REGISTER TABS ===
 function showAuthTab(tab) {
     const tabLogin = document.getElementById('tabLogin');
@@ -802,6 +849,7 @@ function showAuthTab(tab) {
     }
     document.getElementById('authMsg').textContent = '';
 }
+
 // === REGISTER USER ===
 async function registerUser() {
     const name = document.getElementById('regName').value.trim();
@@ -809,6 +857,7 @@ async function registerUser() {
     const pass = document.getElementById('regPass').value;
     const role = document.getElementById('regRole').value;
     const msg = document.getElementById('authMsg');
+
     if (!name || !email || !pass) {
         msg.textContent = ' Please fill in all fields!'; msg.className = 'text-orange-500'; return;
     }
@@ -818,6 +867,7 @@ async function registerUser() {
     if (pass.length < 6) {
         msg.textContent = ' Password must be at least 6 characters!'; msg.className = 'text-orange-500'; return;
     }
+
     try {
         await api('/api/register', { method: 'POST', body: JSON.stringify({ name, email, password: pass, role }) });
         msg.textContent = ' Account created! Please sign in.'; msg.className = 'text-green-500';
@@ -826,12 +876,14 @@ async function registerUser() {
         msg.textContent = `? ${error.message}`; msg.className = 'text-red-500';
     }
 }
+
 // === LOGIN USER ===
 async function loginUser() {
     const email = document.getElementById('loginEmail').value.trim().toLowerCase();
     const pass = document.getElementById('loginPass').value;
     const msg = document.getElementById('authMsg');
     const loginButton = document.getElementById('loginButton');
+
     if (!email || !pass) {
         msg.textContent = ' Enter your email and password.';
         msg.className = 'text-orange-500';
@@ -842,8 +894,10 @@ async function loginUser() {
         msg.className = 'text-orange-500';
         return;
     }
+
     loginButton.disabled = true;
     loginButton.classList.add('opacity-60', 'cursor-not-allowed');
+
     try {
         const data = await api('/api/login', { method: 'POST', body: JSON.stringify({ email, password: pass }) });
         currentUser = data.user;
@@ -859,6 +913,7 @@ async function loginUser() {
         loginButton.classList.remove('opacity-60', 'cursor-not-allowed');
     }
 }
+
 // === SWITCH NURSE TABS ===
 function showNurseTab(tab) {
     document.getElementById('nurseViewDashboard').classList.add('hidden');
@@ -867,6 +922,7 @@ function showNurseTab(tab) {
     document.getElementById('navDashboard').classList.remove('active');
     document.getElementById('navHistory').classList.remove('active');
     document.getElementById('navAppointments').classList.remove('active');
+
     if (tab === 'dashboard') {
         document.getElementById('nurseViewDashboard').classList.remove('hidden');
         document.getElementById('navDashboard').classList.add('active');
@@ -881,6 +937,7 @@ function showNurseTab(tab) {
         renderAllAppointments();
     }
 }
+
 // === OPEN DASHBOARD ===
 function openDashboard() {
     document.getElementById('authSection').classList.add('hidden');
@@ -896,6 +953,7 @@ function openDashboard() {
         setDateRestrictions();
     }
 }
+
 // === ? SUBMIT APPOINTMENT WITH TIME SLOT VALIDATION ===
 async function submitAppointment() {
     if (isSubmittingAppointment) return;
@@ -903,14 +961,17 @@ async function submitAppointment() {
     const time = selectedTimeSlot;
     const type = document.getElementById('aptType').value;
     const reason = document.getElementById('aptReason').value.trim();
+
     if (!date || !time || !reason) { 
         alert(' Please select a date, available time slot, and fill in purpose!'); 
         return; 
     }
+
     const submitButton = document.getElementById('submitAppointmentButton');
     isSubmittingAppointment = true;
     submitButton.disabled = true;
     submitButton.classList.add('opacity-60', 'cursor-not-allowed');
+
     try {
         await api('/api/appointments', {
             method: 'POST', body: JSON.stringify({ date, time, type, reason })
@@ -933,6 +994,7 @@ async function submitAppointment() {
     selectedTimeSlot = null;
     renderMyAppointments();
 }
+
 // === RENDER USER'S APPOINTMENTS ===
 async function renderMyAppointments() {
     let apts;
@@ -967,6 +1029,7 @@ async function renderMyAppointments() {
         </tr>`;
     }).join('');
 }
+
 // === UPDATE STATISTICS ===
 async function updateStats() {
     try {
@@ -980,6 +1043,7 @@ async function updateStats() {
         console.error('Failed to load stats:', error);
     }
 }
+
 // === RENDER ALL APPOINTMENTS (NURSE PANEL) ===
 async function renderAllAppointments() {
     const filterRole = document.getElementById('filterRole').value;
@@ -1038,6 +1102,7 @@ async function renderAllAppointments() {
             `<tr><td colspan="9" class="py-8 text-center text-red-500">? ${error.message}</td></tr>`;
     }
 }
+
 // === APPROVE APPOINTMENT ===
 async function approveAppointment(id) {
     if (!confirm(' Approve this appointment?')) return;
@@ -1051,6 +1116,7 @@ async function approveAppointment(id) {
         alert(`? ${error.message}`);
     }
 }
+
 // === RESCHEDULE APPOINTMENT (REPLACES REJECT) ===
 function openRescheduleModal(id) {
     const a = aptCache[id];
@@ -1064,10 +1130,12 @@ function openRescheduleModal(id) {
     document.getElementById('rsTime').innerHTML = '<option value="">Select a date first...</option>';
     document.getElementById('rescheduleModal').classList.remove('hidden');
 }
+
 function closeRescheduleModal() {
     document.getElementById('rescheduleModal').classList.add('hidden');
     rescheduleId = null;
 }
+
 async function loadRescheduleSlots() {
     const selectedDate = document.getElementById('rsDate').value;
     const select = document.getElementById('rsTime');
@@ -1093,6 +1161,7 @@ async function loadRescheduleSlots() {
         select.innerHTML = `<option value="">${esc(error.message)}</option>`;
     }
 }
+
 async function submitReschedule() {
     const reason = document.getElementById('rsReason').value.trim();
     const newDate = document.getElementById('rsDate').value;
@@ -1120,6 +1189,7 @@ async function submitReschedule() {
         btn.classList.remove('opacity-60', 'cursor-not-allowed');
     }
 }
+
 // === DELETE APPOINTMENT ===
 async function deleteAppointment(id) {
     if (!confirm(' Delete this appointment permanently? This cannot be undone.')) return;
@@ -1134,6 +1204,7 @@ async function deleteAppointment(id) {
         alert(` ${error.message}`);
     }
 }
+
 // === PRINT APPOINTMENT DETAILS ===
 function printAppointment(id) {
     const a = aptCache[id];
@@ -1183,6 +1254,7 @@ function printAppointment(id) {
     w.focus();
     setTimeout(() => { w.print(); }, 300);
 }
+
 // === RENDER APPOINTMENT HISTORY ===
 async function renderHistory(oldestFirst = false) {
     try {
@@ -1229,6 +1301,7 @@ async function renderHistory(oldestFirst = false) {
             `<tr><td colspan="9" class="py-8 text-center text-red-500">? ${error.message}</td></tr>`;
     }
 }
+
 // === SEARCH PATIENT HISTORY ===
 async function searchPatientHistory() {
     const name = document.getElementById('searchPatientName').value.trim().toLowerCase();
@@ -1267,6 +1340,7 @@ async function searchPatientHistory() {
         tableBody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">? ${error.message}</td></tr>`;
     }
 }
+
 // === LOGOUT ===
 async function logoutSystem() {
     if (!confirm('Are you sure you want to log out?')) return;
@@ -1286,6 +1360,7 @@ async function logoutSystem() {
     document.getElementById('authMsg').textContent = '';
     showAuthTab('login');
 }
+
 // === INITIALIZE ON PAGE LOAD ===
 document.addEventListener('DOMContentLoaded', () => {
     setDateRestrictions();
@@ -1293,6 +1368,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 """
     return HTML_CONTENT
+
 # === API ROUTES ===
 @app.post("/api/register")
 def register():
@@ -1328,6 +1404,7 @@ def register():
     finally:
         cur.close()
         conn.close()
+
 @app.post("/api/login")
 def login():
     data = request.get_json()
@@ -1356,10 +1433,12 @@ def login():
     finally:
         cur.close()
         conn.close()
+
 @app.post("/api/logout")
 def logout():
     session.pop("user_id", None)
     return jsonify(message="Logged out successfully."), 200
+
 @app.get("/api/appointments/slots")
 @login_required
 def get_taken_slots():
@@ -1379,6 +1458,7 @@ def get_taken_slots():
     finally:
         cur.close()
         conn.close()
+
 @app.post("/api/appointments")
 @login_required
 def create_appointment():
@@ -1408,6 +1488,7 @@ def create_appointment():
     finally:
         cur.close()
         conn.close()
+
 @app.get("/api/appointments")
 @login_required
 def get_my_appointments():
@@ -1447,6 +1528,7 @@ def get_my_appointments():
     finally:
         cur.close()
         conn.close()
+
 @app.get("/api/appointments/all")
 @nurse_required
 def get_all_appointments():
@@ -1485,6 +1567,7 @@ def get_all_appointments():
     finally:
         cur.close()
         conn.close()
+
 @app.post("/api/appointments/<int:apt_id>/approve")
 @nurse_required
 def approve(apt_id):
@@ -1504,6 +1587,7 @@ def approve(apt_id):
     finally:
         cur.close()
         conn.close()
+
 @app.post("/api/appointments/<int:apt_id>/reject")
 @nurse_required
 def reject(apt_id):
@@ -1530,6 +1614,7 @@ def reject(apt_id):
     finally:
         cur.close()
         conn.close()
+
 # === NEW: RESCHEDULE (nurse sets new date/time + required reason) ===
 @app.post("/api/appointments/<int:apt_id>/reschedule")
 @nurse_required
@@ -1578,6 +1663,7 @@ def reschedule(apt_id):
     finally:
         cur.close()
         conn.close()
+
 # === NEW: DELETE APPOINTMENT (nurse only) ===
 @app.delete("/api/appointments/<int:apt_id>")
 @nurse_required
@@ -1598,6 +1684,7 @@ def delete_appointment(apt_id):
     finally:
         cur.close()
         conn.close()
+
 @app.get("/api/stats")
 @nurse_required
 def get_stats():
@@ -1628,6 +1715,7 @@ def get_stats():
     finally:
         cur.close()
         conn.close()
+
 # === RUN SERVER ===
 if __name__ == "__main__":
     with app.app_context():

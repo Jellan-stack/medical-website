@@ -210,7 +210,7 @@ def index():
         }
         .tab-active {
             border-bottom: 3px solid #3b82f6;
-            color: #2563eb;
+            color: #000000;
             font-weight: 600;
         }
         .status-pending { background: #fef08a; color: #854d0e; }

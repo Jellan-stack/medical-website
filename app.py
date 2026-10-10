@@ -1414,6 +1414,380 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 </script>
+<style>
+.nx-hero{background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 55%,#0ea5e9 100%);border-radius:18px;color:#fff;padding:22px 24px;box-shadow:0 10px 30px rgba(37,99,235,.25);}
+.nx-hero p{color:#dbeafe}
+.nx-chip{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);padding:6px 12px;border-radius:999px;font-size:13px;font-weight:500}
+.nx-kpi{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:16px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 12px rgba(0,0,0,.04);transition:all .3s ease}
+.nx-kpi:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,.08)}
+.nx-kpi .ico{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.nx-kpi .lbl{font-size:12px;color:#6b7280;font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.nx-kpi .val{font-size:26px;font-weight:700;color:#111827;line-height:1.1}
+.nx-seg{display:inline-flex;background:#f1f5f9;border-radius:12px;padding:4px;gap:4px}
+.nx-seg button{padding:8px 16px;border-radius:9px;font-size:13px;font-weight:600;color:#475569}
+.nx-seg button.on{background:#fff;color:#1d4ed8;box-shadow:0 1px 6px rgba(0,0,0,.1)}
+.nx-table th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:600;background:#f8fafc;padding:12px;text-align:left;white-space:nowrap}
+.nx-table td{padding:12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+.nx-table tbody tr:hover{background:#eff6ff}
+.nx-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#06b6d4);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.nx-empty{text-align:center;padding:48px 16px;color:#94a3b8}
+.nx-empty i{font-size:42px;margin-bottom:10px;color:#cbd5e1}
+.nx-new{background:#dcfce7;color:#166534;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:6px;letter-spacing:.04em}
+.nx-badge{background:#ef4444;color:#fff;font-size:11px;font-weight:700;min-width:20px;height:20px;border-radius:999px;display:none;align-items:center;justify-content:center;padding:0 6px;margin-left:auto}
+.nx-chart{display:flex;align-items:flex-end;gap:10px;height:200px;padding:8px 4px 0}
+.nx-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer}
+.nx-bar{width:100%;max-width:38px;border-radius:8px 8px 0 0;background:linear-gradient(180deg,#60a5fa,#2563eb);min-height:4px;transition:all .3s ease;position:relative}
+.nx-bar-col:hover .nx-bar{filter:brightness(1.1);transform:scaleY(1.03);transform-origin:bottom}
+.nx-bar.sel{background:linear-gradient(180deg,#fbbf24,#f59e0b)}
+.nx-bar.zero{background:#e2e8f0}
+.nx-bar-val{font-size:12px;font-weight:700;color:#1e3a8a;margin-bottom:4px}
+.nx-bar-lbl{font-size:11px;color:#64748b;margin-top:6px;font-weight:500}
+.nx-pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
+@media (max-width:640px){.nx-chart{gap:4px}.nx-bar-val{font-size:10px}.nx-bar-lbl{font-size:9px}}
+</style>
+
+<script>
+(function () {
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const SHORT = MONTHS.map(m => m.slice(0, 3));
+    const $ = id => document.getElementById(id);
+
+    let todayData = { today: '', booked: [], scheduled: [] };
+    let todayMode = 'booked';
+    let monthlyYear = new Date().getFullYear();
+    let monthlyData = null;
+    let selectedMonth = null;
+
+    function nurseVisible() {
+        const el = $('nurseDashboard');
+        return el && !el.classList.contains('hidden');
+    }
+
+    function fmtLongDate(iso) {
+        if (!iso) return '';
+        const d = new Date(iso + 'T00:00:00');
+        return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    function stInfo(a) { return typeof statusInfo === 'function' ? statusInfo(a) : { cls: '', text: a.status }; }
+
+    // ---------- BUILD UI ----------
+    function build() {
+        const nav = document.querySelector('#nurseSidebar nav');
+        const main = document.querySelector('#nurseDashboard main');
+        if (!nav || !main || $('navToday')) return;
+
+        const mk = (id, icon, label, tab) => {
+            const a = document.createElement('a');
+            a.href = '#';
+            a.id = id;
+            a.className = 'sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100';
+            a.innerHTML = '<i class="fa-solid ' + icon + ' w-5 text-center"></i> ' + label +
+                (tab === 'today' ? '<span id="nxTodayBadge" class="nx-badge">0</span>' : '');
+            a.addEventListener('click', e => { e.preventDefault(); showNurseTab(tab); });
+            return a;
+        };
+        $('navDashboard').insertAdjacentElement('afterend', mk('navToday', 'fa-calendar-day', "Today's Appointments", 'today'));
+        $('navAppointments').insertAdjacentElement('afterend', mk('navMonthly', 'fa-chart-column', 'Monthly Record', 'monthly'));
+
+        const today = document.createElement('div');
+        today.id = 'nurseViewToday';
+        today.className = 'hidden fade-in';
+        main.appendChild(today);
+
+        const monthly = document.createElement('div');
+        monthly.id = 'nurseViewMonthly';
+        monthly.className = 'hidden fade-in';
+        main.appendChild(monthly);
+    }
+
+    // ---------- TAB ROUTER (wraps original, hindi ginagalaw ang original) ----------
+    function hookRouter() {
+        const orig = window.showNurseTab;
+        window.showNurseTab = function (tab) {
+            ['nurseViewToday', 'nurseViewMonthly'].forEach(id => $(id) && $(id).classList.add('hidden'));
+            ['navToday', 'navMonthly'].forEach(id => $(id) && $(id).classList.remove('active'));
+
+            if (tab === 'today' || tab === 'monthly') {
+                ['nurseViewDashboard', 'nurseViewAppointments', 'nurseViewHistory'].forEach(id => $(id).classList.add('hidden'));
+                ['navDashboard', 'navHistory', 'navAppointments'].forEach(id => $(id).classList.remove('active'));
+                if (tab === 'today') {
+                    $('nurseViewToday').classList.remove('hidden');
+                    $('navToday').classList.add('active');
+                    loadToday();
+                } else {
+                    $('nurseViewMonthly').classList.remove('hidden');
+                    $('navMonthly').classList.add('active');
+                    loadMonthly(monthlyYear);
+                }
+                const sb = $('nurseSidebar');
+                if (window.innerWidth < 768 && sb && !sb.classList.contains('-translate-x-full')) toggleNurseSidebar();
+            } else {
+                orig(tab);
+            }
+        };
+
+        // Auto-refresh ng Today kapag may inaprubahan / nire-reschedule
+        ['approveAppointment', 'submitReschedule', 'deleteAppointment'].forEach(name => {
+            const fn = window[name];
+            if (typeof fn !== 'function') return;
+            window[name] = async function () {
+                const r = await fn.apply(this, arguments);
+                loadToday(true);
+                return r;
+            };
+        });
+    }
+
+    // ---------- TODAY ----------
+    async function loadToday(silent) {
+        try {
+            const data = await api('/api/appointments/today');
+            todayData = data;
+            [...data.booked, ...data.scheduled].forEach(a => { aptCache[a.id] = a; });
+            updateBadge();
+            if (!silent || !$('nurseViewToday').classList.contains('hidden')) renderToday();
+        } catch (e) {
+            if (!silent) $('nurseViewToday').innerHTML = '<div class="dashboard-card p-6 text-red-500">' + esc(e.message) + '</div>';
+        }
+    }
+
+    function updateBadge() {
+        const pending = todayData.booked.filter(a => a.status === 'pending').length;
+        const b = $('nxTodayBadge');
+        if (!b) return;
+        b.textContent = pending;
+        b.style.display = pending > 0 ? 'inline-flex' : 'none';
+    }
+
+    function setTodayMode(m) { todayMode = m; renderToday(); }
+    window.nxSetTodayMode = setTodayMode;
+    window.nxRefreshToday = () => loadToday();
+
+    function renderToday() {
+        const d = todayData;
+        const booked = d.booked, sched = d.scheduled;
+        const pend = booked.filter(a => a.status === 'pending').length;
+        const appr = booked.filter(a => a.status === 'approved').length;
+        const list = todayMode === 'booked' ? booked : sched;
+
+        const kpi = (icon, bg, color, label, val) =>
+            '<div class="nx-kpi"><div class="ico" style="background:' + bg + ';color:' + color + '"><i class="fa-solid ' + icon + '"></i></div>' +
+            '<div><div class="lbl">' + label + '</div><div class="val">' + val + '</div></div></div>';
+
+        const rows = list.map((a, i) => {
+            const st = stInfo(a);
+            const initial = esc((a.userName || '?').trim().charAt(0).toUpperCase());
+            const when = todayMode === 'booked'
+                ? '<div class="font-semibold text-gray-800">' + esc(a.date) + '</div><div class="text-xs text-gray-500">' + esc(a.time) + '</div>'
+                : '<div class="font-semibold text-gray-800">' + esc(a.time) + '</div><div class="text-xs text-gray-500">Today</div>';
+            const bookedAt = todayMode === 'booked'
+                ? '<div class="text-xs text-gray-500"><i class="fa-regular fa-clock mr-1"></i>Booked ' + esc(a.bookedAt || '') + '</div>' : '';
+            const actions = a.status === 'pending'
+                ? '<button onclick="approveAppointment(' + a.id + ')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold mr-1"><i class="fa-solid fa-check mr-1"></i>Approve</button>' +
+                  '<button onclick="openRescheduleModal(' + a.id + ')" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold mr-1"><i class="fa-solid fa-calendar-days mr-1"></i>Reschedule</button>'
+                : '';
+            return '<tr>' +
+                '<td class="text-center text-gray-500">' + (i + 1) + '</td>' +
+                '<td><div class="flex items-center gap-3"><div class="nx-avatar">' + initial + '</div><div>' +
+                    '<div class="font-semibold text-gray-800">' + esc(a.userName) +
+                    (todayMode === 'booked' && a.status === 'pending' ? '<span class="nx-new">NEW</span>' : '') + '</div>' +
+                    '<div class="text-xs text-gray-500">' + esc(a.userRole) + '</div></div></div></td>' +
+                '<td>' + when + bookedAt + '</td>' +
+                '<td class="text-gray-700">' + esc(a.type) + '</td>' +
+                '<td class="max-w-xs text-gray-600" title="' + esc(a.reason) + '"><div class="truncate">' + esc(a.reason) + '</div></td>' +
+                '<td class="text-center"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ' + st.cls + '">' + st.text + '</span></td>' +
+                '<td class="text-center whitespace-nowrap">' + actions +
+                '<button onclick="printAppointment(' + a.id + ')" class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs" title="Print"><i class="fa-solid fa-print"></i></button></td>' +
+                '</tr>';
+        }).join('');
+
+        const emptyMsg = todayMode === 'booked'
+            ? ['fa-inbox', 'No new appointment requests yet today', 'Mga bagong mag-a-appointment ngayong araw ay lalabas dito.']
+            : ['fa-calendar-xmark', 'No appointments scheduled for today', 'Walang naka-schedule na pasyente para ngayong araw.'];
+
+        $('nurseViewToday').innerHTML =
+            '<div class="nx-hero mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">' +
+                '<div><div class="nx-chip mb-3"><i class="fa-solid fa-calendar-day"></i> ' + esc(fmtLongDate(d.today)) + '</div>' +
+                '<h2 class="text-2xl font-bold">Today\'s Appointments</h2>' +
+                '<p class="text-sm mt-1">Real-time view of new requests and patients scheduled for today.</p></div>' +
+                '<button onclick="nxRefreshToday()" class="bg-white/15 hover:bg-white/25 border border-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold self-start md:self-auto"><i class="fa-solid fa-rotate mr-2"></i>Refresh</button>' +
+            '</div>' +
+            '<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">' +
+                kpi('fa-user-plus', '#dbeafe', '#1d4ed8', 'New Requests Today', booked.length) +
+                kpi('fa-hourglass-half', '#fef9c3', '#a16207', 'Awaiting Approval', pend) +
+                kpi('fa-circle-check', '#dcfce7', '#15803d', 'Approved (Today\'s)', appr) +
+                kpi('fa-stethoscope', '#cffafe', '#0e7490', 'Scheduled Today', sched.length) +
+            '</div>' +
+            '<div class="dashboard-card p-4 sm:p-6">' +
+                '<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">' +
+                    '<h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-list-ul text-blue-600 mr-2"></i>' +
+                        (todayMode === 'booked' ? 'Newly Booked Today' : 'Scheduled For Today') + '</h3>' +
+                    '<div class="nx-seg">' +
+                        '<button class="' + (todayMode === 'booked' ? 'on' : '') + '" onclick="nxSetTodayMode(\'booked\')">New Bookings (' + booked.length + ')</button>' +
+                        '<button class="' + (todayMode === 'scheduled' ? 'on' : '') + '" onclick="nxSetTodayMode(\'scheduled\')">Today\'s Schedule (' + sched.length + ')</button>' +
+                    '</div>' +
+                '</div>' +
+                (list.length === 0
+                    ? '<div class="nx-empty"><i class="fa-solid ' + emptyMsg[0] + '"></i><p class="font-semibold text-gray-600">' + emptyMsg[1] + '</p><p class="text-sm mt-1">' + emptyMsg[2] + '</p></div>'
+                    : '<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="nx-table w-full text-sm min-w-max"><thead><tr>' +
+                        '<th class="text-center">#</th><th>Patient</th><th>Schedule</th><th>Visit Type</th><th>Symptoms</th><th class="text-center">Status</th><th class="text-center">Actions</th>' +
+                      '</tr></thead><tbody>' + rows + '</tbody></table></div>') +
+            '</div>';
+    }
+
+    // ---------- MONTHLY ----------
+    async function loadMonthly(year) {
+        const box = $('nurseViewMonthly');
+        try {
+            monthlyData = await api('/api/records/monthly?year=' + encodeURIComponent(year));
+            monthlyYear = monthlyData.year;
+            const nowY = new Date().getFullYear(), nowM = new Date().getMonth() + 1;
+            selectedMonth = (monthlyYear === nowY) ? nowM : (selectedMonth && monthlyData.months.some(m => m.month === selectedMonth) ? selectedMonth : null);
+            await renderMonthly();
+        } catch (e) {
+            box.innerHTML = '<div class="dashboard-card p-6 text-red-500">' + esc(e.message) + '</div>';
+        }
+    }
+    window.nxChangeYear = y => { loadMonthly(parseInt(y, 10)); };
+    window.nxPickMonth = m => { selectedMonth = m; renderMonthly(); };
+
+    async function renderMonthly() {
+        const d = monthlyData;
+        const byMonth = {};
+        d.months.forEach(m => { byMonth[m.month] = m; });
+        const full = MONTHS.map((_, i) => byMonth[i + 1] || { month: i + 1, requests: 0, clients: 0, approved: 0, pending: 0, rejected: 0 });
+
+        const totalVisits = full.reduce((s, m) => s + m.requests, 0);
+        const active = full.filter(m => m.requests > 0);
+        const busiest = active.length ? active.reduce((a, b) => (b.clients > a.clients ? b : a)) : null;
+        const avg = active.length ? (full.reduce((s, m) => s + m.clients, 0) / active.length).toFixed(1) : '0';
+        const maxClients = Math.max(1, ...full.map(m => m.clients));
+
+        const years = d.years.slice();
+        if (!years.includes(d.year)) years.unshift(d.year);
+        const yearOpts = years.sort((a, b) => b - a).map(y => '<option value="' + y + '"' + (y === d.year ? ' selected' : '') + '>' + y + '</option>').join('');
+
+        const kpi = (icon, bg, color, label, val, sub) =>
+            '<div class="nx-kpi"><div class="ico" style="background:' + bg + ';color:' + color + '"><i class="fa-solid ' + icon + '"></i></div>' +
+            '<div><div class="lbl">' + label + '</div><div class="val">' + val + '</div>' +
+            (sub ? '<div class="text-xs text-gray-500">' + sub + '</div>' : '') + '</div></div>';
+
+        const bars = full.map(m => {
+            const h = m.clients > 0 ? Math.max(6, Math.round((m.clients / maxClients) * 150)) : 4;
+            return '<div class="nx-bar-col" onclick="nxPickMonth(' + m.month + ')" title="' + MONTHS[m.month - 1] + ': ' + m.clients + ' client(s)">' +
+                '<div class="nx-bar-val">' + (m.clients || '') + '</div>' +
+                '<div class="nx-bar ' + (m.clients ? '' : 'zero') + (selectedMonth === m.month ? ' sel' : '') + '" style="height:' + h + 'px"></div>' +
+                '<div class="nx-bar-lbl">' + SHORT[m.month - 1] + '</div></div>';
+        }).join('');
+
+        const trs = full.map(m =>
+            '<tr class="cursor-pointer ' + (selectedMonth === m.month ? 'bg-amber-50' : '') + '" onclick="nxPickMonth(' + m.month + ')">' +
+            '<td class="font-semibold text-gray-800">' + MONTHS[m.month - 1] + '</td>' +
+            '<td class="text-center"><span class="nx-pill" style="background:#dbeafe;color:#1e40af">' + m.clients + '</span></td>' +
+            '<td class="text-center text-gray-700">' + m.requests + '</td>' +
+            '<td class="text-center"><span class="nx-pill status-approved">' + m.approved + '</span></td>' +
+            '<td class="text-center"><span class="nx-pill status-pending">' + m.pending + '</span></td>' +
+            '<td class="text-center"><span class="nx-pill status-rejected">' + m.rejected + '</span></td>' +
+            '<td class="text-center text-blue-600"><i class="fa-solid fa-chevron-right text-xs"></i></td></tr>'
+        ).join('');
+
+        $('nurseViewMonthly').innerHTML =
+            '<div class="nx-hero mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">' +
+                '<div><div class="nx-chip mb-3"><i class="fa-solid fa-chart-column"></i> Annual Overview</div>' +
+                '<h2 class="text-2xl font-bold">Monthly Clinic Record</h2>' +
+                '<p class="text-sm mt-1">Number of clients served by the clinic each month.</p></div>' +
+                '<div class="flex items-center gap-2 self-start md:self-auto">' +
+                    '<select onchange="nxChangeYear(this.value)" class="px-3 py-2 rounded-lg text-sm font-semibold text-gray-800 bg-white focus:outline-none">' + yearOpts + '</select>' +
+                    '<button onclick="nxPrintMonthly()" class="bg-white/15 hover:bg-white/25 border border-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold"><i class="fa-solid fa-print mr-2"></i>Print</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">' +
+                kpi('fa-users', '#dbeafe', '#1d4ed8', 'Clients in ' + d.year, d.yearClients, 'Unique patients') +
+                kpi('fa-notes-medical', '#cffafe', '#0e7490', 'Total Requests', totalVisits, 'All statuses') +
+                kpi('fa-ranking-star', '#fef3c7', '#b45309', 'Busiest Month', busiest ? MONTHS[busiest.month - 1] : '—', busiest ? busiest.clients + ' clients' : '') +
+                kpi('fa-gauge-high', '#dcfce7', '#15803d', 'Avg. Clients / Month', avg, 'Active months only') +
+            '</div>' +
+            '<div class="dashboard-card p-4 sm:p-6 mb-6">' +
+                '<h3 class="text-lg font-bold text-gray-800 mb-1"><i class="fa-solid fa-chart-simple text-blue-600 mr-2"></i>Clients per Month — ' + d.year + '</h3>' +
+                '<p class="text-xs text-gray-500 mb-3">Click a bar or a row to see the list of clients for that month.</p>' +
+                '<div class="nx-chart">' + bars + '</div></div>' +
+            '<div class="grid lg:grid-cols-5 gap-6">' +
+                '<div class="dashboard-card p-4 sm:p-6 lg:col-span-3"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-table-list text-blue-600 mr-2"></i>Monthly Summary</h3>' +
+                    '<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="nx-table w-full text-sm"><thead><tr>' +
+                    '<th>Month</th><th class="text-center">Clients</th><th class="text-center">Requests</th><th class="text-center">Approved</th><th class="text-center">Pending</th><th class="text-center">Rejected</th><th></th>' +
+                    '</tr></thead><tbody>' + trs + '</tbody></table></div></div>' +
+                '<div class="dashboard-card p-4 sm:p-6 lg:col-span-2" id="nxMonthDetail"></div>' +
+            '</div>';
+
+        renderMonthDetail();
+    }
+
+    async function renderMonthDetail() {
+        const box = $('nxMonthDetail');
+        if (!selectedMonth) {
+            box.innerHTML = '<div class="nx-empty"><i class="fa-solid fa-hand-pointer"></i><p class="font-semibold text-gray-600">Select a month</p><p class="text-sm mt-1">Pumili ng buwan para makita ang mga client.</p></div>';
+            return;
+        }
+        const key = monthlyYear + '-' + String(selectedMonth).padStart(2, '0');
+        box.innerHTML = '<p class="text-gray-400 text-sm">Loading…</p>';
+        try {
+            const data = await api('/api/records/monthly/' + key);
+            const items = data.clients.map((c, i) =>
+                '<div class="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0">' +
+                '<div class="nx-avatar">' + esc(c.name.trim().charAt(0).toUpperCase()) + '</div>' +
+                '<div class="flex-1 min-w-0"><div class="font-semibold text-gray-800 truncate">' + esc(c.name) + '</div>' +
+                '<div class="text-xs text-gray-500">' + esc(c.role) + ' · Last visit ' + esc(c.lastDate) + '</div></div>' +
+                '<span class="nx-pill" style="background:#dbeafe;color:#1e40af">' + c.visits + ' visit' + (c.visits > 1 ? 's' : '') + '</span></div>'
+            ).join('');
+            box.innerHTML =
+                '<div class="flex justify-between items-start mb-3"><div>' +
+                '<h3 class="text-lg font-bold text-gray-800">' + MONTHS[selectedMonth - 1] + ' ' + monthlyYear + '</h3>' +
+                '<p class="text-sm text-gray-500">' + data.clients.length + ' client' + (data.clients.length === 1 ? '' : 's') + ' served</p></div>' +
+                '<i class="fa-solid fa-user-group text-blue-300 text-2xl"></i></div>' +
+                (data.clients.length ? '<div style="max-height:380px;overflow-y:auto">' + items + '</div>'
+                    : '<div class="nx-empty"><i class="fa-solid fa-folder-open"></i><p class="font-semibold text-gray-600">No clients this month</p></div>');
+        } catch (e) {
+            box.innerHTML = '<p class="text-red-500 text-sm">' + esc(e.message) + '</p>';
+        }
+    }
+
+    window.nxPrintMonthly = function () {
+        if (!monthlyData) return;
+        const byMonth = {};
+        monthlyData.months.forEach(m => { byMonth[m.month] = m; });
+        const rows = MONTHS.map((name, i) => {
+            const m = byMonth[i + 1] || { requests: 0, clients: 0, approved: 0, pending: 0, rejected: 0 };
+            return '<tr><td>' + name + '</td><td>' + m.clients + '</td><td>' + m.requests + '</td><td>' + m.approved + '</td><td>' + m.pending + '</td><td>' + m.rejected + '</td></tr>';
+        }).join('');
+        const w = window.open('', '_blank', 'width=850,height=750');
+        if (!w) { alert('Please allow pop-ups to print.'); return; }
+        w.document.write(
+            '<html><head><title>Monthly Record ' + monthlyData.year + '</title><style>' +
+            'body{font-family:Arial,sans-serif;padding:40px;color:#111}h1{text-align:center;margin:0}p.sub{text-align:center;color:#555;margin:4px 0 28px}' +
+            'table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:9px;text-align:center}th{background:#f1f5f9}td:first-child{text-align:left}' +
+            '.sum{margin:18px 0;font-size:14px}.sig{margin-top:60px;width:220px;border-top:1px solid #000;text-align:center;padding-top:4px;font-size:13px;margin-left:auto}' +
+            '</style></head><body><h1>School Clinic</h1><p class="sub">Monthly Client Record &mdash; ' + monthlyData.year + '</p>' +
+            '<div class="sum"><b>Total unique clients in ' + monthlyData.year + ':</b> ' + monthlyData.yearClients + '</div>' +
+            '<table><thead><tr><th>Month</th><th>Clients</th><th>Requests</th><th>Approved</th><th>Pending</th><th>Rejected</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+            '<div class="sig">School Nurse</div><p style="font-size:12px;color:#777;margin-top:24px">Printed: ' + esc(new Date().toLocaleString()) + '</p></body></html>'
+        );
+        w.document.close(); w.focus();
+        setTimeout(() => w.print(), 300);
+    };
+
+    // ---------- INIT ----------
+    document.addEventListener('DOMContentLoaded', () => {
+        build();
+        hookRouter();
+        // I-refresh ang pulang bilang sa sidebar habang naka-login ang nurse
+        setInterval(() => { if (nurseVisible()) loadToday(true); }, 30000);
+        const obs = new MutationObserver(() => { if (nurseVisible()) { loadToday(true); obs.disconnect(); } });
+        obs.observe($('nurseDashboard'), { attributes: true, attributeFilter: ['class'] });
+    });
+})();
+</script>
+
 </body>
 </html>
 """
@@ -1773,6 +2147,136 @@ def get_stats():
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
+
+
+# === NURSE: TODAY'S APPOINTMENTS ===
+@app.get("/api/appointments/today")
+@nurse_required
+def get_today_appointments():
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
+    base = """
+        SELECT a.id, u.name, u.role, a.date, a.time, a.type, a.reason, a.status,
+               a.rejection_reason, a.reschedule_reason, a.old_date, a.old_time,
+               to_char(a.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila', 'HH12:MI AM')
+        FROM appointments a
+        JOIN users u ON a.user_id = u.id
+    """
+    try:
+        cur.execute("SELECT to_char(NOW() AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD')")
+        today = cur.fetchone()[0]
+
+        # Bagong nag-book ngayong araw (booked today)
+        cur.execute(
+            base + """
+            WHERE (a.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila')::date
+                  = (NOW() AT TIME ZONE 'Asia/Manila')::date
+            ORDER BY a.created_at DESC
+            """
+        )
+        booked_rows = cur.fetchall()
+
+        # May schedule ngayong araw (scheduled today)
+        cur.execute(base + " WHERE a.date = %s ORDER BY a.time ASC", (today,))
+        scheduled_rows = cur.fetchall()
+
+        def pack(rows):
+            out = []
+            for r in rows:
+                item = appointment_rows_to_list([r])[0]
+                item["bookedAt"] = r[12]
+                out.append(item)
+            return out
+
+        return jsonify(today=today, booked=pack(booked_rows), scheduled=pack(scheduled_rows)), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
+
+# === NURSE: MONTHLY RECORD (summary per month for a year) ===
+@app.get("/api/records/monthly")
+@nurse_required
+def get_monthly_record():
+    year = request.args.get("year", type=int) or datetime.now().year
+
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT substr(date, 6, 2),
+                   COUNT(*),
+                   COUNT(DISTINCT user_id) FILTER (WHERE status <> 'rejected'),
+                   COUNT(*) FILTER (WHERE status = 'approved'),
+                   COUNT(*) FILTER (WHERE status = 'pending'),
+                   COUNT(*) FILTER (WHERE status = 'rejected')
+            FROM appointments
+            WHERE substr(date, 1, 4) = %s
+            GROUP BY 1
+            ORDER BY 1
+        """, (str(year),))
+        months = [
+            {"month": int(r[0]), "requests": r[1], "clients": r[2],
+             "approved": r[3], "pending": r[4], "rejected": r[5]}
+            for r in cur.fetchall()
+        ]
+
+        cur.execute("""
+            SELECT COUNT(DISTINCT user_id) FROM appointments
+            WHERE substr(date, 1, 4) = %s AND status <> 'rejected'
+        """, (str(year),))
+        year_clients = cur.fetchone()[0]
+
+        cur.execute("SELECT DISTINCT substr(date, 1, 4) FROM appointments ORDER BY 1 DESC")
+        years = [int(r[0]) for r in cur.fetchall()]
+
+        return jsonify(year=year, years=years, yearClients=year_clients, months=months), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
+
+# === NURSE: LIST OF CLIENTS IN ONE MONTH (month = YYYY-MM) ===
+@app.get("/api/records/monthly/<string:month>")
+@nurse_required
+def get_monthly_clients(month):
+    try:
+        datetime.strptime(month, "%Y-%m")
+    except ValueError:
+        return jsonify(error="Invalid month format."), 400
+
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT u.name, u.role, COUNT(*), MAX(a.date)
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE substr(a.date, 1, 7) = %s AND a.status <> 'rejected'
+            GROUP BY u.id, u.name, u.role
+            ORDER BY COUNT(*) DESC, u.name ASC
+        """, (month,))
+        clients = [
+            {"name": r[0], "role": r[1], "visits": r[2], "lastDate": r[3]}
+            for r in cur.fetchall()
+        ]
+        return jsonify(month=month, clients=clients), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
 
 
 # === RUN SERVER ===

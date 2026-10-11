@@ -1,6 +1,10 @@
 from datetime import datetime
 from functools import wraps
+from html import escape
+from email.message import EmailMessage
 import os
+import smtplib
+import threading
 from pathlib import Path
 
 import psycopg2
@@ -9,6 +13,14 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 # === DATABASE CONFIGURATION ===
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# === EMAIL (GMAIL SMTP) CONFIGURATION ===
+# Gumamit ng Gmail App Password (hindi ang normal na password).
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER")          # Gmail ng clinic
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")  # Gmail App Password
+MAIL_FROM = os.environ.get("MAIL_FROM", SMTP_USER)
 
 BASE_DIR = Path(__file__).resolve().parent
 app = Flask(__name__, static_folder=str(BASE_DIR), static_url_path="")
@@ -42,6 +54,85 @@ TIME_SLOTS = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
 ]
+
+
+# === EMAIL HELPERS ===
+def _pretty_date(d):
+    try:
+        return datetime.strptime(d, "%Y-%m-%d").strftime("%A, %B %d, %Y")
+    except Exception:
+        return d
+
+
+def _pretty_time(t):
+    try:
+        return datetime.strptime(t, "%H:%M").strftime("%I:%M %p").lstrip("0")
+    except Exception:
+        return t
+
+
+def _send_email(to_email, subject, text_body, html_body):
+    if not (SMTP_USER and SMTP_PASSWORD):
+        print("Email skipped: SMTP_USER / SMTP_PASSWORD not set.")
+        return
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = f"School Clinic <{MAIL_FROM}>"
+        msg["To"] = to_email
+        msg.set_content(text_body)
+        msg.add_alternative(html_body, subtype="html")
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(msg)
+        print(f"Email sent to {to_email}")
+    except Exception as e:
+        print(f"Email error: {e}")
+
+
+def notify_user(kind, to_email, name, date, time, visit_type,
+                reason=None, old_date=None, old_time=None):
+    """kind = 'approved' | 'rescheduled'. Tumatakbo sa background thread."""
+    when = f"{_pretty_date(date)} at {_pretty_time(time)}"
+    if kind == "approved":
+        subject = "Your clinic appointment is APPROVED"
+        color, title = "#16a34a", "Appointment Approved ✔"
+        intro = "Good news! The school nurse has approved your appointment."
+        extra_text, extra_html = "", ""
+    else:
+        subject = "Your clinic appointment was RESCHEDULED"
+        color, title = "#2563eb", "Appointment Rescheduled"
+        intro = "The school nurse has moved your appointment to a new schedule."
+        prev = f"{_pretty_date(old_date)} at {_pretty_time(old_time)}" if old_date else "—"
+        extra_text = f"\nPrevious schedule: {prev}\nReason: {reason}\n"
+        extra_html = (
+            f"<tr><td style='padding:6px 0;color:#6b7280'>Previous</td><td>{escape(prev)}</td></tr>"
+            f"<tr><td style='padding:6px 0;color:#6b7280'>Reason</td><td>{escape(reason or '')}</td></tr>"
+        )
+
+    text_body = (
+        f"Hello {name},\n\n{intro}\n\nSchedule: {when}\nVisit type: {visit_type}\n"
+        f"{extra_text}\nPlease arrive 5-10 minutes early and bring your school ID.\n\n- School Clinic"
+    )
+    html_body = f"""
+    <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+      <div style="background:{color};color:#fff;padding:18px 22px"><h2 style="margin:0">{title}</h2></div>
+      <div style="padding:22px;color:#111827">
+        <p>Hello <b>{escape(name)}</b>,</p>
+        <p>{intro}</p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <tr><td style="padding:6px 0;color:#6b7280;width:110px">Schedule</td><td><b>{escape(when)}</b></td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280">Visit type</td><td>{escape(visit_type)}</td></tr>
+          {extra_html}
+        </table>
+        <p style="margin-top:18px;font-size:13px;color:#4b5563">Please arrive 5-10 minutes early and bring your school ID.</p>
+      </div>
+      <div style="background:#f9fafb;padding:12px 22px;font-size:12px;color:#9ca3af">School Clinic Appointment System</div>
+    </div>"""
+    threading.Thread(
+        target=_send_email, args=(to_email, subject, text_body, html_body), daemon=True
+    ).start()
 
 
 # === DATABASE INITIALIZATION — POSTGRESQL SYNTAX ===
@@ -1141,10 +1232,10 @@ async function renderAllAppointments() {
 
 // === APPROVE APPOINTMENT ===
 async function approveAppointment(id) {
-    if (!confirm('Approve this appointment?')) return;
+    if (!confirm('Approve this appointment? An email notification will be sent to the patient.')) return;
     try {
         await api(`/api/appointments/${id}/approve`, { method: 'POST' });
-        alert('Appointment approved!');
+        alert('Appointment approved! Email notification sent to the patient.');
         updateStats();
         renderAllAppointments();
         renderHistory(false);
@@ -1213,7 +1304,7 @@ async function submitReschedule() {
             method: 'POST',
             body: JSON.stringify({ date: newDate, time: newTime, reason })
         });
-        alert('Appointment rescheduled.');
+        alert('Appointment rescheduled. Email notification sent to the patient.');
         closeRescheduleModal();
         updateStats();
         renderAllAppointments();
@@ -1656,7 +1747,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const d = monthlyData;
         const byMonth = {};
         d.months.forEach(m => { byMonth[m.month] = m; });
-        const full = MONTHS.map((_, i) => byMonth[i + 1] || { month: i + 1, requests: 0, clients: 0, approved: 0, pending: 0, rejected: 0 });
+        const full = MONTHS.map((_, i) => byMonth[i + 1] || { month: i + 1, requests: 0, clients: 0, approved: 0, pending: 0, rescheduled: 0 });
 
         const totalVisits = full.reduce((s, m) => s + m.requests, 0);
         const active = full.filter(m => m.requests > 0);
@@ -1688,7 +1779,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '<td class="text-center text-gray-700">' + m.requests + '</td>' +
             '<td class="text-center"><span class="nx-pill status-approved">' + m.approved + '</span></td>' +
             '<td class="text-center"><span class="nx-pill status-pending">' + m.pending + '</span></td>' +
-            '<td class="text-center"><span class="nx-pill status-rejected">' + m.rejected + '</span></td>' +
+            '<td class="text-center"><span class="nx-pill status-rescheduled">' + m.rescheduled + '</span></td>' +
             '<td class="text-center text-blue-600"><i class="fa-solid fa-chevron-right text-xs"></i></td></tr>'
         ).join('');
 
@@ -1715,7 +1806,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '<div class="grid lg:grid-cols-5 gap-6">' +
                 '<div class="dashboard-card p-4 sm:p-6 lg:col-span-3"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-table-list text-blue-600 mr-2"></i>Monthly Summary</h3>' +
                     '<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="nx-table w-full text-sm"><thead><tr>' +
-                    '<th>Month</th><th class="text-center">Clients</th><th class="text-center">Requests</th><th class="text-center">Approved</th><th class="text-center">Pending</th><th class="text-center">Rejected</th><th></th>' +
+                    '<th>Month</th><th class="text-center">Clients</th><th class="text-center">Requests</th><th class="text-center">Approved</th><th class="text-center">Pending</th><th class="text-center">Rescheduled</th><th></th>' +
                     '</tr></thead><tbody>' + trs + '</tbody></table></div></div>' +
                 '<div class="dashboard-card p-4 sm:p-6 lg:col-span-2" id="nxMonthDetail"></div>' +
             '</div>';
@@ -1757,8 +1848,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const byMonth = {};
         monthlyData.months.forEach(m => { byMonth[m.month] = m; });
         const rows = MONTHS.map((name, i) => {
-            const m = byMonth[i + 1] || { requests: 0, clients: 0, approved: 0, pending: 0, rejected: 0 };
-            return '<tr><td>' + name + '</td><td>' + m.clients + '</td><td>' + m.requests + '</td><td>' + m.approved + '</td><td>' + m.pending + '</td><td>' + m.rejected + '</td></tr>';
+            const m = byMonth[i + 1] || { requests: 0, clients: 0, approved: 0, pending: 0, rescheduled: 0 };
+            return '<tr><td>' + name + '</td><td>' + m.clients + '</td><td>' + m.requests + '</td><td>' + m.approved + '</td><td>' + m.pending + '</td><td>' + m.rescheduled + '</td></tr>';
         }).join('');
         const w = window.open('', '_blank', 'width=850,height=750');
         if (!w) { alert('Please allow pop-ups to print.'); return; }
@@ -1769,7 +1860,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '.sum{margin:18px 0;font-size:14px}.sig{margin-top:60px;width:220px;border-top:1px solid #000;text-align:center;padding-top:4px;font-size:13px;margin-left:auto}' +
             '</style></head><body><h1>School Clinic</h1><p class="sub">Monthly Client Record &mdash; ' + monthlyData.year + '</p>' +
             '<div class="sum"><b>Total unique clients in ' + monthlyData.year + ':</b> ' + monthlyData.yearClients + '</div>' +
-            '<table><thead><tr><th>Month</th><th>Clients</th><th>Requests</th><th>Approved</th><th>Pending</th><th>Rejected</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+            '<table><thead><tr><th>Month</th><th>Clients</th><th>Requests</th><th>Approved</th><th>Pending</th><th>Rescheduled</th></tr></thead><tbody>' + rows + '</tbody></table>' +
             '<div class="sig">School Nurse</div><p style="font-size:12px;color:#777;margin-top:24px">Printed: ' + esc(new Date().toLocaleString()) + '</p></body></html>'
         );
         w.document.close(); w.focus();
@@ -1991,6 +2082,7 @@ def get_all_appointments():
         cur.close()
 
 
+# === APPROVE (nagpapadala ng email sa Gmail ng user) ===
 @app.post("/api/appointments/<int:apt_id>/approve")
 @nurse_required
 def approve(apt_id):
@@ -2000,11 +2092,23 @@ def approve(apt_id):
 
     cur = conn.cursor()
     try:
-        cur.execute("UPDATE appointments SET status = 'approved' WHERE id = %s", (apt_id,))
-        if cur.rowcount == 0:
+        cur.execute("""
+            SELECT a.status, a.date, a.time, a.type, u.name, u.email
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.id = %s
+        """, (apt_id,))
+        row = cur.fetchone()
+        if row is None:
             return jsonify(error="Appointment not found."), 404
+
+        cur.execute("UPDATE appointments SET status = 'approved' WHERE id = %s", (apt_id,))
         conn.commit()
-        return jsonify(message="Appointment approved."), 200
+
+        # iwas double-email kapag na-approve na dati
+        if row[0] != "approved":
+            notify_user("approved", row[5], row[4], row[1], row[2], row[3])
+        return jsonify(message="Appointment approved. Email notification sent."), 200
     except Exception as e:
         conn.rollback()
         return jsonify(error=str(e)), 500
@@ -2041,7 +2145,7 @@ def reject(apt_id):
         cur.close()
 
 
-# === RESCHEDULE (nurse sets new date/time + required reason) ===
+# === RESCHEDULE (nurse sets new date/time + required reason; may email din) ===
 @app.post("/api/appointments/<int:apt_id>/reschedule")
 @nurse_required
 def reschedule(apt_id):
@@ -2070,7 +2174,12 @@ def reschedule(apt_id):
 
     cur = conn.cursor()
     try:
-        cur.execute("SELECT date, time FROM appointments WHERE id = %s", (apt_id,))
+        cur.execute("""
+            SELECT a.date, a.time, a.type, u.name, u.email
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.id = %s
+        """, (apt_id,))
         current = cur.fetchone()
         if current is None:
             return jsonify(error="Appointment not found."), 404
@@ -2085,6 +2194,11 @@ def reschedule(apt_id):
             WHERE id = %s
         """, (current[0], current[1], new_date, new_time, reason, apt_id))
         conn.commit()
+
+        notify_user(
+            "rescheduled", current[4], current[3], new_date, new_time, current[2],
+            reason=reason, old_date=current[0], old_time=current[1],
+        )
         return jsonify(message="Appointment rescheduled."), 200
     except Exception as e:
         conn.rollback()
@@ -2214,9 +2328,9 @@ def get_monthly_record():
             SELECT substr(date, 6, 2),
                    COUNT(*),
                    COUNT(DISTINCT user_id) FILTER (WHERE status <> 'rejected'),
-                   COUNT(*) FILTER (WHERE status = 'approved'),
+                   COUNT(*) FILTER (WHERE status = 'approved' AND reschedule_reason IS NULL),
                    COUNT(*) FILTER (WHERE status = 'pending'),
-                   COUNT(*) FILTER (WHERE status = 'rejected')
+                   COUNT(*) FILTER (WHERE reschedule_reason IS NOT NULL)
             FROM appointments
             WHERE substr(date, 1, 4) = %s
             GROUP BY 1
@@ -2224,7 +2338,7 @@ def get_monthly_record():
         """, (str(year),))
         months = [
             {"month": int(r[0]), "requests": r[1], "clients": r[2],
-             "approved": r[3], "pending": r[4], "rejected": r[5]}
+             "approved": r[3], "pending": r[4], "rescheduled": r[5]}
             for r in cur.fetchall()
         ]
 
@@ -2276,7 +2390,6 @@ def get_monthly_clients(month):
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
-
 
 
 # === RUN SERVER ===

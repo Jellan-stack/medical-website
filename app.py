@@ -1535,6 +1535,41 @@ document.addEventListener('DOMContentLoaded', () => {
 .nx-bar-lbl{font-size:11px;color:#64748b;margin-top:6px;font-weight:500}
 .nx-pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
 @media (max-width:640px){.nx-chart{gap:4px}.nx-bar-val{font-size:10px}.nx-bar-lbl{font-size:9px}}
+
+/* ===== MONTHLY RECORD: RESPONSIVE FIX ===== */
+#nurseDashboard main { min-width: 0; }
+#nurseViewMonthly { min-width: 0; }
+#nurseViewMonthly .grid > * { min-width: 0; }          /* pinipigilan ang table na magpalobo ng layout */
+#nurseViewMonthly .nx-kpi { min-width: 0; }
+#nurseViewMonthly .nx-kpi > div:last-child { min-width: 0; }
+#nurseViewMonthly .nx-kpi .val { overflow-wrap: anywhere; }  /* para sa "September" atbp. */
+
+/* Tablet at maliliit na laptop (may sidebar): i-stack ang table at detail panel */
+@media (max-width: 1279px) {
+  #nurseViewMonthly .grid.lg\:grid-cols-5 { grid-template-columns: minmax(0, 1fr); }
+  #nurseViewMonthly .lg\:col-span-3,
+  #nurseViewMonthly .lg\:col-span-2 { grid-column: 1 / -1; }
+}
+
+/* Phone */
+@media (max-width: 640px) {
+  #nurseViewMonthly .nx-hero { padding: 16px; }
+  #nurseViewMonthly .nx-hero h2 { font-size: 1.25rem; }
+  #nurseViewMonthly .nx-hero > div:last-child { width: 100%; }
+  #nurseViewMonthly .nx-hero > div:last-child select { flex: 1; }
+
+  #nurseViewMonthly .nx-kpi { padding: 12px; gap: 10px; }
+  #nurseViewMonthly .nx-kpi .ico { width: 38px; height: 38px; font-size: 15px; }
+  #nurseViewMonthly .nx-kpi .val { font-size: 20px; }
+  #nurseViewMonthly .nx-kpi .lbl { font-size: 11px; }
+
+  #nurseViewMonthly .nx-chart { gap: 3px; }
+  #nurseViewMonthly .nx-bar-col { min-width: 0; }
+
+  #nurseViewMonthly .nx-table th { padding: 8px; font-size: 11px; }
+  #nurseViewMonthly .nx-table td { padding: 8px; font-size: 13px; }
+  #nurseViewMonthly .nx-pill { padding: 2px 8px; font-size: 11px; }
+}
 </style>
 
 <script>

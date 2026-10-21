@@ -761,7 +761,7 @@ tbody tr { transition: background-color 0.2s ease; }
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="rescheduled">Rescheduled</option>
             </select>
           </div>
         </div>
@@ -1184,7 +1184,8 @@ async function renderAllAppointments() {
         apts.forEach(a => { aptCache[a.id] = a; });
 
         if (filterRole !== 'all') apts = apts.filter(a => a.userRole === filterRole);
-        if (filterStatus !== 'all') apts = apts.filter(a => a.status === filterStatus);
+        if (filterStatus === 'rescheduled') apts = apts.filter(a => a.rescheduleReason);
+        else if (filterStatus !== 'all') apts = apts.filter(a => a.status === filterStatus);
 
         const tbody = document.getElementById('allAppointmentsTable');
         if (apts.length === 0) {

@@ -97,7 +97,7 @@ def notify_user(kind, to_email, name, date, time, visit_type,
     when = f"{_pretty_date(date)} at {_pretty_time(time)}"
     if kind == "approved":
         subject = "Your clinic appointment is APPROVED"
-        color, title = "#16a34a", "Appointment Approved ✔"
+        color, title = "#16a34a", "Appointment Approved ?"
         intro = "Good news! The school nurse has approved your appointment."
         extra_text, extra_html = "", ""
     else:
@@ -1571,6 +1571,30 @@ document.addEventListener('DOMContentLoaded', () => {
   #nurseViewMonthly .nx-table td { padding: 8px; font-size: 13px; }
   #nurseViewMonthly .nx-pill { padding: 2px 8px; font-size: 11px; }
 }
+
+/* ===== TODAY'S APPOINTMENTS: RESPONSIVE FIX (para gumana sa phone / tablet / laptop) ===== */
+#nurseViewToday { min-width: 0; }
+#nurseViewToday .grid > * { min-width: 0; }
+#nurseViewToday .nx-kpi { min-width: 0; }
+#nurseViewToday .nx-kpi > div:last-child { min-width: 0; }
+#nurseViewToday .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+#nurseViewToday .nx-no { display:inline-flex; align-items:center; justify-content:center; min-width:28px; height:28px; border-radius:999px; background:#dbeafe; color:#1e40af; font-weight:700; font-size:13px; }
+
+@media (max-width: 640px) {
+  #nurseViewToday .nx-hero { padding: 16px; }
+  #nurseViewToday .nx-hero h2 { font-size: 1.25rem; }
+
+  #nurseViewToday .nx-kpi { padding: 12px; gap: 10px; }
+  #nurseViewToday .nx-kpi .ico { width: 38px; height: 38px; font-size: 15px; }
+  #nurseViewToday .nx-kpi .val { font-size: 20px; }
+  #nurseViewToday .nx-kpi .lbl { font-size: 11px; }
+
+  #nurseViewToday .nx-seg { width: 100%; }
+  #nurseViewToday .nx-seg button { flex: 1; padding: 8px 6px; font-size: 12px; }
+
+  #nurseViewToday .nx-table th { padding: 8px; font-size: 11px; }
+  #nurseViewToday .nx-table td { padding: 8px; font-size: 13px; }
+}
 </style>
 
 <script>
@@ -1597,6 +1621,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stInfo(a) { return typeof statusInfo === 'function' ? statusInfo(a) : { cls: '', text: a.status }; }
+
+    // ---------- SORT: pinakamaagang petsa at oras ang #1 ----------
+    function timeKey(a) {
+        const parts = String(a.time || '').split(':');
+        const h = (parts[0] || '0').trim().padStart(2, '0');
+        const m = (parts[1] || '00').trim().padStart(2, '0');
+        return String(a.date || '') + ' ' + h + ':' + m;
+    }
+
+    function sortByDateTime(list) {
+        return (list || []).slice().sort((x, y) => {
+            const kx = timeKey(x), ky = timeKey(y);
+            if (kx < ky) return -1;
+            if (kx > ky) return 1;
+            return (x.id || 0) - (y.id || 0);
+        });
+    }
 
     // ---------- BUILD UI ----------
     function build() {
@@ -1670,8 +1711,13 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadToday(silent) {
         try {
             const data = await api('/api/appointments/today');
-            todayData = data;
-            [...data.booked, ...data.scheduled].forEach(a => { aptCache[a.id] = a; });
+            // Naka-ayos ayon sa petsa at oras: 8:00 = #1, 8:30 = #2, at iba pa
+            todayData = {
+                today: data.today,
+                booked: sortByDateTime(data.booked),
+                scheduled: sortByDateTime(data.scheduled)
+            };
+            [...todayData.booked, ...todayData.scheduled].forEach(a => { aptCache[a.id] = a; });
             updateBadge();
             if (!silent || !$('nurseViewToday').classList.contains('hidden')) renderToday();
         } catch (e) {
@@ -1715,7 +1761,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   '<button onclick="openRescheduleModal(' + a.id + ')" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold mr-1"><i class="fa-solid fa-calendar-days mr-1"></i>Reschedule</button>'
                 : '';
             return '<tr>' +
-                '<td class="text-center text-gray-500">' + (i + 1) + '</td>' +
+                '<td class="text-center"><span class="nx-no">' + (i + 1) + '</span></td>' +
                 '<td><div class="flex items-center gap-3"><div class="nx-avatar">' + initial + '</div><div>' +
                     '<div class="font-semibold text-gray-800">' + esc(a.userName) +
                     (todayMode === 'booked' && a.status === 'pending' ? '<span class="nx-new">NEW</span>' : '') + '</div>' +
@@ -2320,17 +2366,19 @@ def get_today_appointments():
         today = cur.fetchone()[0]
 
         # Bagong nag-book ngayong araw (booked today)
+        # Naka-ayos ayon sa petsa at oras ng appointment: pinakamaaga ang una (#1)
         cur.execute(
             base + """
             WHERE (a.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila')::date
                   = (NOW() AT TIME ZONE 'Asia/Manila')::date
-            ORDER BY a.created_at DESC
+            ORDER BY a.date ASC, a.time ASC, a.id ASC
             """
         )
         booked_rows = cur.fetchall()
 
         # May schedule ngayong araw (scheduled today)
-        cur.execute(base + " WHERE a.date = %s ORDER BY a.time ASC", (today,))
+        # Pinakamaagang oras ang una (8:00 = #1, 8:30 = #2, at iba pa)
+        cur.execute(base + " WHERE a.date = %s ORDER BY a.time ASC, a.id ASC", (today,))
         scheduled_rows = cur.fetchall()
 
         def pack(rows):

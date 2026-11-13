@@ -2474,7 +2474,469 @@ def get_monthly_clients(month):
         return jsonify(error=str(e)), 500
     finally:
         cur.close()
+# =====================================================================
+# CLINIC UPDATE  -  I-paste ang BUONG code na ito sa app.py,
+# mismo sa ITAAS ng linyang:   # === RUN SERVER ===
+# (wala nang ibang babaguhin sa app.py)
+# =====================================================================
+import re
 
+VISIT_TYPES = ("First Aid", "Health Promotion", "Medical")
+CIVIL_STATUSES = ("Single", "Married", "Separated", "Widowed")
+
+
+def calc_age(born):
+    today = datetime.now().date()
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
+# ---------- DATABASE: bagong columns sa users ----------
+_orig_init_db = init_db
+
+
+def init_db():
+    _orig_init_db()
+    conn = get_db()
+    if not conn:
+        return
+    cur = conn.cursor()
+    for col, typ in (("birthday", "TEXT"), ("civil_status", "TEXT"), ("address", "TEXT"),
+                     ("age", "INTEGER"), ("religion", "TEXT"), ("course", "TEXT"),
+                     ("gender", "TEXT"), ("nationality", "TEXT"), ("contact", "TEXT")):
+        cur.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {typ}")
+    conn.commit()
+    cur.close()
+
+
+# ---------- BACKEND: visit type (3 lang) ----------
+@app.before_request
+def _check_visit_type():
+    if request.method == "POST" and request.path == "/api/appointments":
+        d = request.get_json(silent=True) or {}
+        if d.get("type") not in VISIT_TYPES:
+            return jsonify(error="Invalid visit type."), 400
+
+
+# ---------- BACKEND: Create Account na may personal info ----------
+def register_v2():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    role = data.get("role") or ""
+
+    if not all([name, email, password, role]):
+        return jsonify(error="All fields are required."), 400
+    if not email.endswith("@gmail.com"):
+        return jsonify(error="Email must end with @gmail.com."), 400
+    if len(password) < 6:
+        return jsonify(error="Password must be at least 6 characters."), 400
+    if role not in ("Student", "Teacher", "Staff"):
+        return jsonify(error="Invalid role selected."), 400
+
+    birthday = (data.get("birthday") or "").strip()
+    civil_status = (data.get("civilStatus") or "").strip()
+    address = (data.get("address") or "").strip()
+    religion = (data.get("religion") or "").strip()
+    course = (data.get("course") or "").strip()
+    gender = (data.get("gender") or "").strip()
+    nationality = (data.get("nationality") or "").strip()
+    contact = re.sub(r"[\s-]", "", data.get("contact") or "")
+
+    if not all([birthday, civil_status, address, religion, gender, nationality, contact]):
+        return jsonify(error="Please fill in all personal information."), 400
+    if role == "Student" and not course:
+        return jsonify(error="Course is required for students."), 400
+    try:
+        age = calc_age(datetime.strptime(birthday, "%Y-%m-%d").date())
+    except ValueError:
+        return jsonify(error="Invalid birthday."), 400
+    if age < 5 or age > 100:
+        return jsonify(error="Invalid birthday."), 400
+    if civil_status not in CIVIL_STATUSES:
+        return jsonify(error="Invalid civil status."), 400
+    if gender not in ("Male", "Female"):
+        return jsonify(error="Invalid gender."), 400
+    if not re.fullmatch(r"(09|\+639)\d{9}", contact):
+        return jsonify(error="Invalid contact number."), 400
+
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        if cur.fetchone():
+            return jsonify(error="Email already registered."), 409
+
+        cur.execute(
+            "INSERT INTO users (name, email, password_hash, role, birthday, civil_status, address, "
+            "age, religion, course, gender, nationality, contact) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (name, email, generate_password_hash(password), role, birthday, civil_status, address,
+             age, religion, course, gender, nationality, contact),
+        )
+        conn.commit()
+        return jsonify(message="Account created successfully!"), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify(error=f"Registration failed: {str(e)}"), 500
+    finally:
+        cur.close()
+
+
+app.view_functions["register"] = register_v2
+
+
+# ---------- BACKEND: Monthly record (bilang ng clients per visit type) ----------
+def monthly_v2():
+    year = request.args.get("year", type=int) or datetime.now().year
+
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT substr(date, 6, 2),
+                   COUNT(*),
+                   COUNT(DISTINCT user_id) FILTER (WHERE status <> 'rejected'),
+                   COUNT(*) FILTER (WHERE status = 'approved' AND reschedule_reason IS NULL),
+                   COUNT(*) FILTER (WHERE status = 'pending'),
+                   COUNT(*) FILTER (WHERE reschedule_reason IS NOT NULL),
+                   COUNT(DISTINCT user_id) FILTER (WHERE status <> 'rejected' AND type ILIKE 'First Aid%%'),
+                   COUNT(DISTINCT user_id) FILTER (WHERE status <> 'rejected' AND type ILIKE 'Health Promotion%%'),
+                   COUNT(DISTINCT user_id) FILTER (WHERE status <> 'rejected'
+                        AND type NOT ILIKE 'First Aid%%' AND type NOT ILIKE 'Health Promotion%%')
+            FROM appointments
+            WHERE substr(date, 1, 4) = %s
+            GROUP BY 1
+            ORDER BY 1
+        """, (str(year),))
+        months = [
+            {"month": int(r[0]), "requests": r[1], "clients": r[2],
+             "approved": r[3], "pending": r[4], "rescheduled": r[5],
+             "firstAid": r[6], "health": r[7], "medical": r[8]}
+            for r in cur.fetchall()
+        ]
+
+        cur.execute("""
+            SELECT COUNT(DISTINCT user_id) FROM appointments
+            WHERE substr(date, 1, 4) = %s AND status <> 'rejected'
+        """, (str(year),))
+        year_clients = cur.fetchone()[0]
+
+        cur.execute("SELECT DISTINCT substr(date, 1, 4) FROM appointments ORDER BY 1 DESC")
+        years = [int(r[0]) for r in cur.fetchall()]
+
+        return jsonify(year=year, years=years, yearClients=year_clients, months=months), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
+
+app.view_functions["get_monthly_record"] = nurse_required(monthly_v2)
+
+
+# ---------- BACKEND: listahan ng patients (auto-fill ng Medical Certificate) ----------
+def patients_v1():
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id, name, role, birthday, civil_status, address, religion,
+                   course, gender, nationality, contact
+            FROM users WHERE role <> 'nurse' ORDER BY name ASC
+        """)
+        out = []
+        for r in cur.fetchall():
+            age = ""
+            try:
+                if r[3]:
+                    age = calc_age(datetime.strptime(r[3], "%Y-%m-%d").date())
+            except ValueError:
+                pass
+            out.append({
+                "id": r[0], "name": r[1], "role": r[2], "birthday": r[3],
+                "civilStatus": r[4], "address": r[5], "religion": r[6],
+                "course": r[7], "gender": r[8], "nationality": r[9],
+                "contact": r[10], "age": age,
+            })
+        return jsonify(patients=out), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
+
+app.add_url_rule("/api/patients", "get_patients", nurse_required(patients_v1), methods=["GET"])
+
+
+# ---------- FRONTEND: binabago ang HTML_CONTENT ----------
+def _hrep(old, new):
+    global HTML_CONTENT
+    if HTML_CONTENT.count(old) != 1:
+        raise RuntimeError("Clinic update: hindi tumugma ang bahaging ito ng HTML:\n" + old[:90])
+    HTML_CONTENT = HTML_CONTENT.replace(old, new)
+
+
+_INP = 'w-full px-4 py-2.5 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500'
+_LBL = 'block font-medium mb-1'
+
+_hrep('placeholder="Juan Dela Cruz">', f'''placeholder="Juan Dela Cruz">
+          </div>
+          <div class="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
+            <div><label class="{_LBL}">Birthday</label><input type="date" id="regBirthday" class="{_INP}"></div>
+            <div><label class="{_LBL}">Age</label><input type="text" id="regAge" readonly class="{_INP}" placeholder="Auto"></div>
+            <div><label class="{_LBL}">Civil Status</label>
+              <select id="regCivil" class="{_INP}"><option value="">Select...</option><option>Single</option><option>Married</option><option>Separated</option><option>Widowed</option></select></div>
+            <div><label class="{_LBL}">Gender</label>
+              <select id="regGender" class="{_INP}"><option value="">Select...</option><option>Male</option><option>Female</option></select></div>
+            <div class="min-[420px]:col-span-2"><label class="{_LBL}">Address</label><input type="text" id="regAddress" class="{_INP}" placeholder="Barangay, Municipality, Province"></div>
+            <div><label class="{_LBL}">Religion</label><input type="text" id="regReligion" class="{_INP}" placeholder="e.g. Roman Catholic"></div>
+            <div><label class="{_LBL}">Nationality</label><input type="text" id="regNationality" class="{_INP}" value="Filipino"></div>
+            <div><label class="{_LBL}">Course</label><input type="text" id="regCourse" class="{_INP}" placeholder="e.g. BSIT (students)"></div>
+            <div><label class="{_LBL}">Contact #</label><input type="tel" id="regContact" class="{_INP}" placeholder="09123456789"></div>
+          </div>
+          <div class="hidden">''')
+
+_hrep("const role = document.getElementById('regRole').value;", r'''const role = document.getElementById('regRole').value;
+    const gv = id => document.getElementById(id).value.trim();
+    const profile = {
+        birthday: gv('regBirthday'), civilStatus: gv('regCivil'), address: gv('regAddress'),
+        age: gv('regAge'), religion: gv('regReligion'), course: gv('regCourse'),
+        gender: gv('regGender'), nationality: gv('regNationality'), contact: gv('regContact')
+    };
+    {
+        const m0 = document.getElementById('authMsg');
+        const missing = !profile.birthday || !profile.civilStatus || !profile.address || !profile.religion ||
+            !profile.gender || !profile.nationality || !profile.contact || (role === 'Student' && !profile.course);
+        const badPhone = profile.contact && !/^(09|\+639)\d{9}$/.test(profile.contact.replace(/[\s-]/g, ''));
+        if (missing || badPhone) {
+            m0.textContent = missing ? 'Please fill in all personal information!' : 'Enter a valid contact number (e.g. 09123456789).';
+            m0.className = 'mt-4 text-center font-medium text-orange-600';
+            return;
+        }
+    }''')
+_hrep("body: JSON.stringify({ name, email, password: pass, role })",
+      "body: JSON.stringify({ name, email, password: pass, role, ...profile })")
+
+HTML_CONTENT, _n = re.subn(
+    r"<option>General Consultation</option>.*?<option>Other Medical Concern</option>",
+    lambda m: "<option>First Aid</option>\n          <option>Health Promotion</option>\n          <option>Medical</option>",
+    HTML_CONTENT, flags=re.S)
+if _n != 1:
+    raise RuntimeError("Clinic update: visit type options not found")
+
+_hrep("const maxClients = Math.max(1, ...full.map(m => m.clients));",
+      "const maxClients = Math.max(1, ...full.map(m => Math.max(m.firstAid || 0, m.health || 0, m.medical || 0)));")
+
+_NEW_BARS = r'''const bars = full.map(m => {
+            const hh = v => v > 0 ? Math.max(6, Math.round((v / maxClients) * 150)) : 3;
+            const one = (v, c) => '<div class="nx-b3"><div class="nx-b3v">' + (v || '') + '</div>' +
+                '<div class="nx-b3b" style="height:' + hh(v) + 'px;background:' + c + (v ? '' : ';opacity:.35') + '"></div></div>';
+            return '<div class="nx-grp' + (selectedMonth === m.month ? ' sel' : '') + '" onclick="nxPickMonth(' + m.month + ')" title="' +
+                MONTHS[m.month - 1] + ' - First Aid: ' + (m.firstAid || 0) + ', Health Promotion: ' + (m.health || 0) + ', Medical: ' + (m.medical || 0) + '">' +
+                '<div class="nx-bars3">' + one(m.firstAid || 0, '#22c55e') + one(m.health || 0, '#facc15') + one(m.medical || 0, '#3b82f6') + '</div>' +
+                '<div class="nx-bar-lbl">' + SHORT[m.month - 1] + '</div></div>';
+        }).join('');'''
+HTML_CONTENT, _n = re.subn(r"const bars = full\.map\(m => \{.*?\}\)\.join\(''\);",
+                           lambda m: _NEW_BARS, HTML_CONTENT, count=1, flags=re.S)
+if _n != 1:
+    raise RuntimeError("Clinic update: monthly bars not found")
+
+_hrep("""'<div class="nx-chart">' + bars + '</div></div>' +""",
+      """'<div class="nx-legend"><span><i style="background:#22c55e"></i>First Aid</span><span><i style="background:#facc15"></i>Health Promotion</span><span><i style="background:#3b82f6"></i>Medical</span></div>' +
+                '<div class="nx-chart-scroll"><div class="nx-chart nx-chart3">' + bars + '</div></div></div>' +""")
+
+_EXTRA = r'''
+<style>
+#formRegister select, #formRegister input { min-width: 0; }
+.nx-chart-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px}
+.nx-chart3{min-width:640px;height:auto;align-items:flex-end;gap:4px}
+.nx-grp{flex:1;min-width:48px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;cursor:pointer;border-radius:10px;padding:4px 2px}
+.nx-grp:hover,.nx-grp.sel{background:#fffbeb}
+.nx-bars3{display:flex;align-items:flex-end;gap:2px;height:185px}
+.nx-b3{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:14px}
+.nx-b3v{font-size:10px;font-weight:700;color:#1e293b;margin-bottom:2px;min-height:12px}
+.nx-b3b{width:100%;border-radius:4px 4px 0 0;transition:all .3s ease}
+.nx-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#475569;margin-bottom:8px}
+.nx-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+#nurseViewCert{min-width:0}
+</style>
+
+<script>
+function nxCalcAge(iso) {
+    if (!iso) return '';
+    const b = new Date(iso + 'T00:00:00'), t = new Date();
+    let a = t.getFullYear() - b.getFullYear();
+    const m = t.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && t.getDate() < b.getDate())) a--;
+    return a >= 0 ? a : '';
+}
+document.addEventListener('DOMContentLoaded', () => {
+    const b = document.getElementById('regBirthday');
+    if (!b) return;
+    b.max = new Date().toISOString().split('T')[0];
+    b.addEventListener('change', () => { document.getElementById('regAge').value = nxCalcAge(b.value); });
+});
+
+// ===== MEDICAL CERTIFICATE (Nurse Panel, kasunod ng Monthly Record) =====
+(function () {
+    const $ = id => document.getElementById(id);
+    let patients = [];
+
+    const CERT_CSS =
+'.cert-paper{background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:2;padding:32px 40px;max-width:820px;margin:0 auto;box-shadow:0 4px 24px rgba(0,0,0,.12);border:1px solid #e5e7eb;box-sizing:border-box}' +
+'.cert-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #1e3a8a;padding-bottom:10px;margin-bottom:22px}' +
+'.cert-head img{width:72px;height:72px;object-fit:contain}' +
+'.cert-head .u{font-size:22px;font-weight:800;letter-spacing:.5px;line-height:1.15}' +
+'.cert-head .s{font-size:14px;line-height:1.35;color:#333}' +
+'.cert-title{text-align:center;font-size:30px;font-weight:800;margin:26px 0 30px;letter-spacing:1px}' +
+'.cert-paper p{margin:0 0 18px;text-align:justify}' +
+'.cf{display:inline-block;min-width:70px;max-width:100%;border-bottom:1px solid #111;padding:0 6px;outline:none;line-height:1.5;min-height:1.5em;vertical-align:baseline;word-break:break-word}' +
+'.cf:focus{background:#eff6ff}' +
+'.cf:empty:before{content:attr(data-ph);color:#9ca3af;font-size:.85em}' +
+'.cf.md{min-width:150px}.cf.lg{min-width:min(280px,100%)}' +
+'.cf.line{display:block;margin-top:6px}' +
+'.cert-sign{margin-top:40px;line-height:1.4}' +
+'.cert-foot{margin-top:60px;font-size:12px;font-style:italic;font-weight:600;line-height:1.4}' +
+'@media(max-width:640px){.cert-paper{padding:18px 16px;font-size:14px}.cert-head img{width:52px;height:52px}.cert-head .u{font-size:16px}.cert-head .s{font-size:12px}.cert-title{font-size:22px}}';
+
+    const CERT_HTML =
+'<div class="nx-hero mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">' +
+  '<div><div class="nx-chip mb-3"><i class="fa-solid fa-file-medical"></i> Health Services Unit</div>' +
+  '<h2 class="text-2xl font-bold">Medical Certificate</h2>' +
+  '<p class="text-sm mt-1">I-click ang mga linya para mag-type, tapos i-print.</p></div>' +
+  '<div class="flex flex-wrap gap-2 items-center">' +
+    '<select id="certPatient" onchange="certFill(this.value)" class="px-3 py-2 rounded-lg text-sm font-semibold text-gray-800 bg-white focus:outline-none max-w-full w-full sm:w-64"><option value="">Auto-fill from patient (optional)</option></select>' +
+    '<button onclick="certClear()" class="bg-white/15 hover:bg-white/25 border border-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold"><i class="fa-solid fa-eraser mr-2"></i>Clear</button>' +
+    '<button onclick="certPrint()" class="bg-white text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-lg text-sm font-semibold"><i class="fa-solid fa-print mr-2"></i>Print</button>' +
+  '</div></div>' +
+'<div class="overflow-x-auto"><div class="cert-paper" id="certPaper">' +
+  '<div class="cert-head"><img src="slsu.png.png" alt="SLSU">' +
+    '<div><div class="u">SOUTHERN LUZON STATE UNIVERSITY</div>' +
+    '<div class="s">Judge Guillermo Eleazar Campus, Tagkawayan<br>Health Services Unit<br>' +
+    '<span contenteditable="true" spellcheck="false">nursekrista_slsujge@slsu.edu.ph</span></div></div></div>' +
+  '<div class="cert-title">MEDICAL CERTIFICATE</div>' +
+  '<p>Date <span class="cf md" id="cfDate" contenteditable="true" data-ph="Date"></span></p>' +
+  '<p>To whom it may concern:</p>' +
+  '<p>This is to certify that <b><span class="cf" id="cfTitle" contenteditable="true" data-ph="Mr/Ms/Mrs"></span></b> ' +
+    '<span class="cf lg" id="cfName" contenteditable="true" data-ph="Full name"></span>, ' +
+    '<span class="cf" id="cfGender" contenteditable="true" data-ph="Male/Female"></span>, ' +
+    '<span class="cf" id="cfAge" contenteditable="true" data-ph="Age" style="min-width:50px"></span> years old, ' +
+    '<span class="cf" id="cfCivil" contenteditable="true" data-ph="single/married/separated"></span>, from ' +
+    '<span class="cf lg" id="cfAddress" contenteditable="true" data-ph="Address"></span>, was seen and examined on ' +
+    '<span class="cf md" id="cfExam" contenteditable="true" data-ph="Date"></span> and was diagnosed to ' +
+    '<span class="cf lg" id="cfDiag" contenteditable="true" data-ph="Diagnosis"></span>.</p>' +
+  '<p>I therefore recommend <span class="cf lg" id="cfRec" contenteditable="true" data-ph="Recommendation"></span>' +
+    '<span class="cf line" contenteditable="true"></span><span class="cf line" contenteditable="true"></span></p>' +
+  '<p>This certificate is being issued upon the request of <span class="cf lg" id="cfReq" contenteditable="true" data-ph="Msr/Ms. name"></span> ' +
+    'for whatever purpose it may serve (excluding legal matters).</p>' +
+  '<div class="cert-sign">Respectfully Yours,<br><br><br>' +
+    '<b contenteditable="true" spellcheck="false">KRISTA KEITH C. GUERRA, RN, CHRA</b><br>' +
+    '<span contenteditable="true" spellcheck="false">Head, Health Services Unit</span></div>' +
+  '<div class="cert-foot">OP-SLSU-JGE-AFA-HSU-3.0.F1<br>Effective: 11/23/2026</div>' +
+'</div></div>';
+
+    function today() { return new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
+    function set(id, v) { const e = $(id); if (e) e.textContent = v; }
+
+    async function loadPatients() {
+        try {
+            const d = await api('/api/patients');
+            patients = d.patients;
+            $('certPatient').innerHTML = '<option value="">Auto-fill from patient (optional)</option>' +
+                patients.map(p => '<option value="' + p.id + '">' + esc(p.name) + ' (' + esc(p.role) + ')</option>').join('');
+        } catch (e) { console.error(e); }
+    }
+
+    window.certFill = function (id) {
+        const p = patients.find(x => String(x.id) === String(id));
+        if (!p) return;
+        const title = p.gender === 'Female' ? 'Ms.' : (p.gender === 'Male' ? 'Mr.' : '');
+        set('cfDate', today()); set('cfExam', today());
+        set('cfTitle', title); set('cfName', p.name);
+        set('cfGender', p.gender || ''); set('cfAge', p.age === '' ? '' : p.age);
+        set('cfCivil', (p.civilStatus || '').toLowerCase()); set('cfAddress', p.address || '');
+        set('cfReq', (title ? title + ' ' : '') + p.name);
+    };
+
+    window.certClear = function () {
+        $('certPaper').querySelectorAll('.cf').forEach(e => { e.textContent = ''; });
+        $('certPatient').value = '';
+    };
+
+    window.certPrint = function () {
+        const paper = $('certPaper').cloneNode(true);
+        paper.querySelectorAll('[contenteditable]').forEach(e => e.removeAttribute('contenteditable'));
+        const w = window.open('', '_blank', 'width=900,height=1100');
+        if (!w) { alert('Please allow pop-ups to print.'); return; }
+        w.document.write('<html><head><title>Medical Certificate</title><base href="' + location.origin + '/"><style>' + CERT_CSS +
+            '@page{size:8.5in 11in;margin:.5in}body{margin:0}.cert-paper{box-shadow:none;border:0;padding:0;max-width:none;font-size:15px;line-height:1.9}' +
+            '.cf:empty:before{content:none}.cert-title{font-size:28px}' +
+            '</style></head><body>' + paper.outerHTML + '</body></html>');
+        w.document.close(); w.focus();
+        setTimeout(() => w.print(), 600);
+    };
+
+    function build() {
+        const nav = document.querySelector('#nurseSidebar nav');
+        const main = document.querySelector('#nurseDashboard main');
+        if (!nav || !main || $('navCert')) return;
+        const st = document.createElement('style'); st.textContent = CERT_CSS; document.head.appendChild(st);
+
+        const a = document.createElement('a');
+        a.href = '#'; a.id = 'navCert';
+        a.className = 'sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100';
+        a.innerHTML = '<i class="fa-solid fa-file-medical w-5 text-center"></i> Medical Certificate';
+        a.addEventListener('click', e => { e.preventDefault(); showNurseTab('cert'); });
+        ($('navMonthly') || $('navAppointments')).insertAdjacentElement('afterend', a);
+
+        const v = document.createElement('div');
+        v.id = 'nurseViewCert'; v.className = 'hidden fade-in'; v.innerHTML = CERT_HTML;
+        v.addEventListener('paste', e => {
+            e.preventDefault();
+            document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text'));
+        });
+        main.appendChild(v);
+    }
+
+    function hook() {
+        const prev = window.showNurseTab;
+        window.showNurseTab = function (tab) {
+            $('nurseViewCert').classList.add('hidden');
+            $('navCert').classList.remove('active');
+            if (tab === 'cert') {
+                ['nurseViewDashboard', 'nurseViewAppointments', 'nurseViewHistory', 'nurseViewToday', 'nurseViewMonthly']
+                    .forEach(id => $(id) && $(id).classList.add('hidden'));
+                ['navDashboard', 'navHistory', 'navAppointments', 'navToday', 'navMonthly']
+                    .forEach(id => $(id) && $(id).classList.remove('active'));
+                $('nurseViewCert').classList.remove('hidden');
+                $('navCert').classList.add('active');
+                if (!$('cfDate').textContent) set('cfDate', today());
+                loadPatients();
+                const sb = $('nurseSidebar');
+                if (window.innerWidth < 768 && sb && !sb.classList.contains('-translate-x-full')) toggleNurseSidebar();
+            } else {
+                prev(tab);
+            }
+        };
+    }
+
+    document.addEventListener('DOMContentLoaded', () => { build(); hook(); });
+})();
+</script>
+'''
+_hrep("\n</body>\n</html>", _EXTRA + "\n</body>\n</html>")
+
+# ===================== TAPOS NA ANG CLINIC UPDATE =====================
 
 # === RUN SERVER ===
 if __name__ == "__main__":

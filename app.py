@@ -2867,7 +2867,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <div class="nx-hero mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
   <div><div class="nx-chip mb-3"><i class="fa-solid fa-file-medical"></i> Health Services Unit</div>
   <h2 class="text-2xl font-bold">Medical Certificate</h2>
-  <p class="text-sm mt-1">I-type sa mga linya. I-click ang Mr/Ms/Mrs, Male/Female at civil status para i-underline (click ulit para alisin).</p></div>
+  <p class="text-sm mt-1">"Type on the provided lines. Click Mr./Ms./Mrs., Male/Female, and Civil Status to underline your selection (click again to remove the underline).".</p></div>
   <div class="flex flex-wrap gap-2 items-center">
     <select id="certPatient" onchange="certFill(this.value)" class="px-3 py-2 rounded-lg text-sm font-semibold text-gray-800 bg-white focus:outline-none max-w-full w-full sm:w-64"><option value="">Auto-fill from patient (optional)</option></select>
     <button onclick="certClear()" class="bg-white/15 hover:bg-white/25 border border-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold"><i class="fa-solid fa-eraser mr-2"></i>Clear</button>
@@ -2875,7 +2875,7 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 <div class="dashboard-card p-4 sm:p-5 mb-6">
-  <h3 class="text-base font-bold text-gray-800 mb-3"><i class="fa-solid fa-id-card text-blue-600 mr-2"></i>Patient Information <span class="text-xs font-normal text-gray-500">(galing sa Create Account)</span></h3>
+  <h3 class="text-base font-bold text-gray-800 mb-3"><i class="fa-solid fa-id-card text-blue-600 mr-2"></i>Patient Information <span class="text-xs font-normal text-gray-500"></span></h3>
   <div id="certInfoBody"></div>
 </div>
 <div class="overflow-x-auto"><div class="cert-paper" id="certPaper">

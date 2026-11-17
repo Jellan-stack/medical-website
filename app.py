@@ -2968,6 +2968,86 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 '''
+_PRINT_HOOK = r'''
+<script>
+// Print button ng appointment -> bubukas ang Medical Certificate na naka-fill na
+window.printAppointment = async function (id) {
+    try {
+        const d = await api('/api/appointments/' + id + '/certificate');
+        const p = d.patient, a = d.appointment;
+
+        showNurseTab('cert');
+
+        const $ = x => document.getElementById(x);
+        const set = (x, v) => { const e = $(x); if (e) e.textContent = v; };
+        const pick = (group, value) => {
+            document.querySelectorAll('#certPaper .og[data-g="' + group + '"] .opt').forEach(o => {
+                o.classList.toggle('on', !!value && o.dataset.v.toLowerCase() === String(value).toLowerCase());
+            });
+        };
+
+        const longDate = iso => new Date(iso + 'T00:00:00')
+            .toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const female = p.gender === 'Female', male = p.gender === 'Male';
+
+        set('cfDate', todayStr);
+        set('cfExam', a.date ? longDate(a.date) : todayStr);
+        set('cfName', p.name || '');
+        set('cfAge', p.age === '' || p.age === null ? '' : p.age);
+        set('cfAddress', p.address || '');
+        set('cfReq', p.name || '');
+        set('cfDiag', '');
+        set('cfRec', '');
+        pick('title', female ? 'Ms' : (male ? 'Mr' : ''));
+        pick('gender', p.gender || '');
+        pick('civil', ['Single', 'Married', 'Separated'].includes(p.civilStatus) ? p.civilStatus : '');
+        pick('req', female ? 'Ms' : (male ? 'Msr' : ''));
+    } catch (e) {
+        alert(e.message);
+    }
+};
+</script>
+'''
+# ---------- BACKEND: datos ng appointment + patient para sa Medical Certificate ----------
+def apt_certificate_v1(apt_id):
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT u.id, u.name, u.role, u.birthday, u.civil_status, u.address,
+                   u.gender, a.date, a.time, a.type, a.reason
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.id = %s
+        """, (apt_id,))
+        r = cur.fetchone()
+        if r is None:
+            return jsonify(error="Appointment not found."), 404
+
+        age = ""
+        try:
+            if r[3]:
+                age = calc_age(datetime.strptime(r[3], "%Y-%m-%d").date())
+        except ValueError:
+            pass
+
+        return jsonify(
+            patient={"id": r[0], "name": r[1], "role": r[2], "birthday": r[3],
+                     "civilStatus": r[4], "address": r[5], "gender": r[6], "age": age},
+            appointment={"date": r[7], "time": r[8], "type": r[9], "reason": r[10]},
+        ), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
+
+app.add_url_rule("/api/appointments/<int:apt_id>/certificate", "apt_certificate",
+                 nurse_required(apt_certificate_v1), methods=["GET"])
 _hrep("\n</body>\n</html>", _EXTRA + "\n</body>\n</html>")
 
 # ===================== TAPOS NA ANG CLINIC UPDATE =====================

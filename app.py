@@ -12,15 +12,6 @@ import psycopg2
 from flask import Flask, Response, g, jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-# =====================================================================
-# MGA LOGO NG MEDICAL CERTIFICATE
-# I-paste ang dati mong base64 string sa loob ng quotes (galing sa lumang app.py,
-# yung nasa LOGO_L / LOGO_M / LOGO_R, nagsisimula sa data:image/jpeg;base64,...)
-# =====================================================================
-_LOGO_L = "PASTE_LOGO_L_HERE"
-_LOGO_M = "PASTE_LOGO_M_HERE"
-_LOGO_R = "PASTE_LOGO_R_HERE"
-
 # === DATABASE CONFIGURATION ===
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
@@ -39,6 +30,32 @@ app.config["SECRET_KEY"] = os.environ.get(
 )
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+
+# =====================================================================
+# MGA LOGO NG MEDICAL CERTIFICATE
+# Kinukuha ang 3 logo mula sa lumang file na naka-rename bilang "app_old.py"
+# (nasa parehong folder). Kapag wala, gagamitin ang slsu.png.png.
+# =====================================================================
+def _load_logos():
+    logos = {}
+    old = BASE_DIR / "app_old.py"
+    if old.exists():
+        try:
+            text = old.read_text(encoding="utf-8", errors="ignore")
+            for key, data in re.findall(r"LOGO_([LMR])\s*=\s*['\"](data:image/[^'\"]+)['\"]", text):
+                logos[key] = data
+        except Exception as e:
+            print(f"Hindi mabasa ang app_old.py: {e}")
+    fallback = "slsu.png.png"
+    for key in "LMR":
+        logos.setdefault(key, fallback)
+    if all(v == fallback for v in logos.values()):
+        print("Paalala: walang app_old.py, kaya slsu.png.png ang gagamiting logo sa certificate.")
+    return logos
+
+
+_LOGOS = _load_logos()
 
 
 # === ISA LANG NA GET_DB FUNCTION — PARA SA POSTGRESQL ===
@@ -1344,11 +1361,9 @@ async function deleteAppointment(id) {
     }
 }
 
-// === PRINT APPOINTMENT DETAILS (papalitan ng Medical Certificate sa dulo ng file) ===
+// === PRINT (papalitan ng Medical Certificate auto-fill sa dulo ng file) ===
 function printAppointment(id) {
-    const a = aptCache[id];
-    if (!a) { alert('Appointment details not found.'); return; }
-    alert('Print handler not loaded.');
+    alert('Loading... pakisubukan ulit.');
 }
 
 // === RENDER APPOINTMENT HISTORY ===
@@ -1635,7 +1650,7 @@ document.addEventListener('DOMContentLoaded', () => {
         main.appendChild(monthly);
     }
 
-    // ---------- TAB ROUTER ----------
+    // ---------- TAB ROUTER (wraps original, hindi ginagalaw ang original) ----------
     function hookRouter() {
         const orig = window.showNurseTab;
         window.showNurseTab = function (tab) {
@@ -2329,6 +2344,7 @@ def get_today_appointments():
         cur.execute("SELECT to_char(NOW() AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD')")
         today = cur.fetchone()[0]
 
+        # Bagong nag-book ngayong araw (booked today)
         cur.execute(
             base + """
             WHERE (a.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila')::date
@@ -2338,6 +2354,7 @@ def get_today_appointments():
         )
         booked_rows = cur.fetchall()
 
+        # May schedule ngayong araw (scheduled today)
         cur.execute(base + " WHERE a.date = %s ORDER BY a.time ASC, a.id ASC", (today,))
         scheduled_rows = cur.fetchall()
 
@@ -2599,6 +2616,22 @@ def monthly_v2():
 app.view_functions["get_monthly_record"] = nurse_required(monthly_v2)
 
 
+def _patient_dict(r):
+    """r = (id, name, role, birthday, civil_status, address, religion, course, gender, nationality, contact)"""
+    age = ""
+    try:
+        if r[3]:
+            age = calc_age(datetime.strptime(r[3], "%Y-%m-%d").date())
+    except ValueError:
+        pass
+    return {
+        "id": r[0], "name": r[1], "role": r[2], "birthday": r[3],
+        "civilStatus": r[4], "address": r[5], "religion": r[6],
+        "course": r[7], "gender": r[8], "nationality": r[9],
+        "contact": r[10], "age": age,
+    }
+
+
 # ---------- BACKEND: listahan ng patients (auto-fill ng Medical Certificate) ----------
 def patients_v1():
     conn = get_db()
@@ -2612,21 +2645,7 @@ def patients_v1():
                    course, gender, nationality, contact
             FROM users WHERE role <> 'nurse' ORDER BY name ASC
         """)
-        out = []
-        for r in cur.fetchall():
-            age = ""
-            try:
-                if r[3]:
-                    age = calc_age(datetime.strptime(r[3], "%Y-%m-%d").date())
-            except ValueError:
-                pass
-            out.append({
-                "id": r[0], "name": r[1], "role": r[2], "birthday": r[3],
-                "civilStatus": r[4], "address": r[5], "religion": r[6],
-                "course": r[7], "gender": r[8], "nationality": r[9],
-                "contact": r[10], "age": age,
-            })
-        return jsonify(patients=out), 200
+        return jsonify(patients=[_patient_dict(r) for r in cur.fetchall()]), 200
     except Exception as e:
         return jsonify(error=str(e)), 500
     finally:
@@ -2636,7 +2655,7 @@ def patients_v1():
 app.add_url_rule("/api/patients", "get_patients", nurse_required(patients_v1), methods=["GET"])
 
 
-# ---------- BACKEND: datos ng appointment + patient para sa Medical Certificate ----------
+# ---------- BACKEND: buong info ng nag-appointment (para sa Patient Info at Certificate) ----------
 def apt_certificate_v1(apt_id):
     conn = get_db()
     if not conn:
@@ -2645,8 +2664,9 @@ def apt_certificate_v1(apt_id):
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT u.id, u.name, u.role, u.birthday, u.civil_status, u.address,
-                   u.gender, a.date, a.time, a.type, a.reason
+            SELECT u.id, u.name, u.role, u.birthday, u.civil_status, u.address, u.religion,
+                   u.course, u.gender, u.nationality, u.contact,
+                   a.date, a.time, a.type, a.reason
             FROM appointments a
             JOIN users u ON a.user_id = u.id
             WHERE a.id = %s
@@ -2654,18 +2674,9 @@ def apt_certificate_v1(apt_id):
         r = cur.fetchone()
         if r is None:
             return jsonify(error="Appointment not found."), 404
-
-        age = ""
-        try:
-            if r[3]:
-                age = calc_age(datetime.strptime(r[3], "%Y-%m-%d").date())
-        except ValueError:
-            pass
-
         return jsonify(
-            patient={"id": r[0], "name": r[1], "role": r[2], "birthday": r[3],
-                     "civilStatus": r[4], "address": r[5], "gender": r[6], "age": age},
-            appointment={"date": r[7], "time": r[8], "type": r[9], "reason": r[10]},
+            patient=_patient_dict(r[:11]),
+            appointment={"date": r[11], "time": r[12], "type": r[13], "reason": r[14]},
         ), 200
     except Exception as e:
         return jsonify(error=str(e)), 500
@@ -2681,6 +2692,14 @@ app.add_url_rule("/api/appointments/<int:apt_id>/certificate", "apt_certificate"
 def _hrep(old, new):
     global HTML_CONTENT
     if HTML_CONTENT.count(old) != 1:
+        raise RuntimeError("Clinic update: hindi tumugma ang bahaging ito ng HTML:\n" + old[:90])
+    HTML_CONTENT = HTML_CONTENT.replace(old, new)
+
+
+def _hrep_all(old, new):
+    """Papalitan ang LAHAT ng tugma (kahit higit sa isa)."""
+    global HTML_CONTENT
+    if HTML_CONTENT.count(old) < 1:
         raise RuntimeError("Clinic update: hindi tumugma ang bahaging ito ng HTML:\n" + old[:90])
     HTML_CONTENT = HTML_CONTENT.replace(old, new)
 
@@ -2754,8 +2773,20 @@ _hrep("""'<div class="nx-chart">' + bars + '</div></div>' +""",
       """'<div class="nx-legend"><span><i style="background:#22c55e"></i>First Aid</span><span><i style="background:#facc15"></i>Health Promotion</span><span><i style="background:#3b82f6"></i>Medical</span></div>' +
                 '<div class="nx-chart-scroll"><div class="nx-chart nx-chart3">' + bars + '</div></div></div>' +""")
 
-# ---------- MEDICAL CERTIFICATE (CSS + JS) ----------
-# Ang mga logo ay isisingit sa dulo gamit ang __LOGO_L__, __LOGO_M__, __LOGO_R__
+# ---------- PATIENT INFO BUTTON (ⓘ) sa lahat ng talahanayan ng nurse ----------
+_hrep_all(
+    r'''<button onclick="printAppointment(${a.id})" class="text-gray-600 hover:text-gray-800 mr-2" title="Print">''',
+    r'''<button onclick="nxShowInfo(${a.id})" class="text-blue-600 hover:text-blue-800 mr-2" title="Patient Info">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </button>
+                    <button onclick="printAppointment(${a.id})" class="text-gray-600 hover:text-gray-800 mr-2" title="Print">''')
+
+_hrep(
+    r"""'<button onclick="printAppointment(' + a.id + ')" class="px-2.5 py-1.5 bg-gray-100""",
+    r"""'<button onclick="nxShowInfo(' + a.id + ')" class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs mr-1" title="Patient Info"><i class="fa-solid fa-circle-info"></i></button>' +
+                '<button onclick="printAppointment(' + a.id + ')" class="px-2.5 py-1.5 bg-gray-100""")
+
+# ---------- MEDICAL CERTIFICATE + PATIENT INFO (CSS + JS) ----------
 _EXTRA = r'''
 <style>
 #formRegister select, #formRegister input { min-width: 0; }
@@ -2770,6 +2801,11 @@ _EXTRA = r'''
 .nx-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#475569;margin-bottom:8px}
 .nx-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 #nurseViewCert{min-width:0}
+.pi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px}
+.pi-grid .pi-full{grid-column:1/-1}
+.pi-item .pi-l{font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.pi-item .pi-v{font-size:14px;color:#111827;font-weight:600;word-break:break-word}
+@media(min-width:900px){.pi-grid.pi-wide{grid-template-columns:repeat(4,minmax(0,1fr))}}
 </style>
 
 <script>
@@ -2788,7 +2824,7 @@ document.addEventListener('DOMContentLoaded', () => {
     b.addEventListener('change', () => { document.getElementById('regAge').value = nxCalcAge(b.value); });
 });
 
-// ===== MEDICAL CERTIFICATE (Nurse Panel, kasunod ng Monthly Record) =====
+// ===== MEDICAL CERTIFICATE + PATIENT INFO (Nurse Panel) =====
 (function () {
     const $ = id => document.getElementById(id);
     let patients = [];
@@ -2818,6 +2854,31 @@ document.addEventListener('DOMContentLoaded', () => {
 '.cert-foot{position:absolute;left:30px;bottom:18px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-style:italic;font-weight:700;line-height:1.35}' +
 '@media(max-width:700px){.cert-paper{padding:16px 14px 80px;font-size:12.5px;min-height:0}.cert-head .lg img,.cert-head .rg img{height:34px}.cert-head .u{font-size:12px}.cert-head .s{font-size:10px}.cert-head .em{font-size:9px;margin-left:0}.cert-title{font-size:20px;margin:24px 0}.cert-body p{margin-bottom:18px;text-align:left}.cert-foot{font-size:11px;left:14px}}';
 
+    // --- Patient Information (laman ng Create Account) ---
+    const PI_FIELDS = [
+        ['Full Name', 'name'], ['Role', 'role'], ['Birthday', 'birthday'], ['Age', 'age'],
+        ['Civil Status', 'civilStatus'], ['Gender', 'gender'], ['Religion', 'religion'], ['Nationality', 'nationality'],
+        ['Course', 'course'], ['Contact #', 'contact'], ['Address', 'address']
+    ];
+    function piValue(p, key) {
+        let v = p ? p[key] : '';
+        if (key === 'birthday' && v) {
+            try { v = new Date(v + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); } catch (e) {}
+        }
+        return (v === undefined || v === null || v === '') ? '—' : v;
+    }
+    function piGridHTML(p, wide) {
+        return '<div class="pi-grid' + (wide ? ' pi-wide' : '') + '">' + PI_FIELDS.map(f =>
+            '<div class="pi-item' + (f[1] === 'address' ? ' pi-full' : '') + '"><div class="pi-l">' + f[0] + '</div><div class="pi-v">' + esc(piValue(p, f[1])) + '</div></div>'
+        ).join('') + '</div>';
+    }
+    function renderInfoCard(p) {
+        const box = $('certInfoBody');
+        if (!box) return;
+        box.innerHTML = p ? piGridHTML(p, true)
+            : '<p class="text-sm text-gray-400 italic">Pumili ng pasyente sa itaas, o pindutin ang 🖨 sa isang appointment para lumabas dito ang personal info.</p>';
+    }
+
     const CERT_HTML = `
 <div class="nx-hero mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
   <div><div class="nx-chip mb-3"><i class="fa-solid fa-file-medical"></i> Health Services Unit</div>
@@ -2828,6 +2889,10 @@ document.addEventListener('DOMContentLoaded', () => {
     <button onclick="certClear()" class="bg-white/15 hover:bg-white/25 border border-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold"><i class="fa-solid fa-eraser mr-2"></i>Clear</button>
     <button onclick="certPrint()" class="bg-white text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-lg text-sm font-semibold"><i class="fa-solid fa-print mr-2"></i>Print</button>
   </div>
+</div>
+<div class="dashboard-card p-4 sm:p-5 mb-6">
+  <h3 class="text-base font-bold text-gray-800 mb-3"><i class="fa-solid fa-id-card text-blue-600 mr-2"></i>Patient Information <span class="text-xs font-normal text-gray-500">(galing sa Create Account)</span></h3>
+  <div id="certInfoBody"></div>
 </div>
 <div class="overflow-x-auto"><div class="cert-paper" id="certPaper">
   <div class="cert-head">
@@ -2863,12 +2928,34 @@ document.addEventListener('DOMContentLoaded', () => {
   <div class="cert-foot">OP-SLSU-JGE-AFA-HSU-3.0.F1<br>Effective: 11/23/2026</div>
 </div></div>`;
 
-    function today() { return new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
+    function fmtDate(iso) {
+        const o = { year: 'numeric', month: 'long', day: 'numeric' };
+        if (!iso) return new Date().toLocaleDateString('en-US', o);
+        return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', o);
+    }
     function set(id, v) { const e = $(id); if (e) e.textContent = v; }
     function pick(group, value) {
         document.querySelectorAll('#certPaper .og[data-g="' + group + '"] .opt').forEach(o => {
             o.classList.toggle('on', !!value && o.dataset.v.toLowerCase() === String(value).toLowerCase());
         });
+    }
+
+    // Pinupunan ang certificate gamit ang info ng pasyente
+    function fillCertificate(p, examIso) {
+        const female = p.gender === 'Female', male = p.gender === 'Male';
+        set('cfDate', fmtDate());
+        set('cfExam', fmtDate(examIso));
+        set('cfName', p.name || '');
+        set('cfAge', (p.age === '' || p.age === null || p.age === undefined) ? '' : p.age);
+        set('cfAddress', p.address || '');
+        set('cfReq', p.name || '');
+        set('cfDiag', '');
+        set('cfRec', '');
+        pick('title', female ? 'Ms' : (male ? 'Mr' : ''));
+        pick('gender', p.gender || '');
+        pick('civil', ['Single', 'Married', 'Separated'].includes(p.civilStatus) ? p.civilStatus : '');
+        pick('req', female ? 'Ms' : (male ? 'Msr' : ''));
+        renderInfoCard(p);
     }
 
     async function loadPatients() {
@@ -2884,21 +2971,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.certFill = function (id) {
         const p = patients.find(x => String(x.id) === String(id));
-        if (!p) return;
-        const female = p.gender === 'Female', male = p.gender === 'Male';
-        set('cfDate', today()); set('cfExam', today());
-        set('cfName', p.name); set('cfAge', p.age === '' ? '' : p.age);
-        set('cfAddress', p.address || ''); set('cfReq', p.name);
-        pick('title', female ? 'Ms' : (male ? 'Mr' : ''));
-        pick('gender', p.gender || '');
-        pick('civil', ['Single', 'Married', 'Separated'].includes(p.civilStatus) ? p.civilStatus : '');
-        pick('req', female ? 'Ms' : (male ? 'Msr' : ''));
+        if (!p) { renderInfoCard(null); return; }
+        fillCertificate(p, null);
     };
 
     window.certClear = function () {
         $('certPaper').querySelectorAll('.cf').forEach(e => { e.textContent = ''; });
         $('certPaper').querySelectorAll('.opt.on').forEach(e => e.classList.remove('on'));
         $('certPatient').value = '';
+        renderInfoCard(null);
     };
 
     window.certPrint = function () {
@@ -2916,32 +2997,48 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => w.print(), 600);
     };
 
-    // ===== PRINT NG APPOINTMENT -> MEDICAL CERTIFICATE NA NAKA-FILL =====
+    // ===== 🖨 PRINT NG APPOINTMENT -> MEDICAL CERTIFICATE NA NAKA-FILL =====
     window.printAppointment = async function (id) {
         try {
             const d = await api('/api/appointments/' + id + '/certificate');
-            const p = d.patient, a = d.appointment;
-
             showNurseTab('cert');
+            await loadPatients();
+            fillCertificate(d.patient, d.appointment.date);
+            $('certPatient').value = String(d.patient.id);
+        } catch (e) {
+            alert(e.message);
+        }
+    };
 
-            const fmt = { year: 'numeric', month: 'long', day: 'numeric' };
-            const todayStr = new Date().toLocaleDateString('en-US', fmt);
-            const examStr = a.date ? new Date(a.date + 'T00:00:00').toLocaleDateString('en-US', fmt) : todayStr;
-            const female = p.gender === 'Female', male = p.gender === 'Male';
-
-            set('cfDate', todayStr);
-            set('cfExam', examStr);
-            set('cfName', p.name || '');
-            set('cfAge', (p.age === '' || p.age === null || p.age === undefined) ? '' : p.age);
-            set('cfAddress', p.address || '');
-            set('cfReq', p.name || '');
-            set('cfDiag', '');
-            set('cfRec', '');
-            pick('title', female ? 'Ms' : (male ? 'Mr' : ''));
-            pick('gender', p.gender || '');
-            pick('civil', ['Single', 'Married', 'Separated'].includes(p.civilStatus) ? p.civilStatus : '');
-            pick('req', female ? 'Ms' : (male ? 'Msr' : ''));
-            $('certPatient').value = String(p.id);
+    // ===== ⓘ PATIENT INFO MODAL =====
+    window.nxShowInfo = async function (id) {
+        try {
+            const d = await api('/api/appointments/' + id + '/certificate');
+            const p = d.patient, a = d.appointment;
+            let m = $('nxInfoModal');
+            if (!m) {
+                m = document.createElement('div');
+                m.id = 'nxInfoModal';
+                m.className = 'hidden fixed inset-0 flex items-center justify-center p-4 bg-black/50';
+                m.style.zIndex = '60';
+                m.addEventListener('click', e => { if (e.target === m) m.classList.add('hidden'); });
+                document.body.appendChild(m);
+                document.addEventListener('keydown', e => { if (e.key === 'Escape') m.classList.add('hidden'); });
+            }
+            m.innerHTML =
+                '<div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">' +
+                '<div class="flex justify-between items-start mb-4"><div>' +
+                '<h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-id-card text-blue-600 mr-2"></i>Patient Information</h3>' +
+                '<p class="text-sm text-gray-500">Appointment: ' + esc(a.date) + ' ' + esc(a.time) + ' · ' + esc(a.type) + '</p></div>' +
+                '<button onclick="document.getElementById(\'nxInfoModal\').classList.add(\'hidden\')" class="text-gray-400 hover:text-gray-700 text-xl"><i class="fa-solid fa-xmark"></i></button></div>' +
+                piGridHTML(p, false) +
+                '<div class="mt-4 pt-4 border-t border-gray-100"><div class="pi-l text-xs text-gray-500 font-semibold uppercase">Purpose / Symptoms</div>' +
+                '<div class="text-sm text-gray-800">' + esc(a.reason || '—') + '</div></div>' +
+                '<div class="flex justify-end gap-2 mt-5">' +
+                '<button onclick="document.getElementById(\'nxInfoModal\').classList.add(\'hidden\')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Close</button>' +
+                '<button onclick="document.getElementById(\'nxInfoModal\').classList.add(\'hidden\');printAppointment(' + id + ')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold"><i class="fa-solid fa-print mr-1"></i> Medical Certificate</button>' +
+                '</div></div>';
+            m.classList.remove('hidden');
         } catch (e) {
             alert(e.message);
         }
@@ -2974,6 +3071,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text'));
         });
         main.appendChild(v);
+        renderInfoCard(null);
     }
 
     function hook() {
@@ -2988,7 +3086,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     .forEach(id => $(id) && $(id).classList.remove('active'));
                 $('nurseViewCert').classList.remove('hidden');
                 $('navCert').classList.add('active');
-                if (!$('cfDate').textContent) set('cfDate', today());
+                if (!$('cfDate').textContent) set('cfDate', fmtDate());
                 loadPatients();
                 const sb = $('nurseSidebar');
                 if (window.innerWidth < 768 && sb && !sb.classList.contains('-translate-x-full')) toggleNurseSidebar();
@@ -3004,9 +3102,9 @@ document.addEventListener('DOMContentLoaded', () => {
 '''
 
 # Isingit ang mga logo sa script
-_EXTRA = (_EXTRA.replace("__LOGO_L__", _LOGO_L)
-                .replace("__LOGO_M__", _LOGO_M)
-                .replace("__LOGO_R__", _LOGO_R))
+_EXTRA = (_EXTRA.replace("__LOGO_L__", _LOGOS["L"])
+                .replace("__LOGO_M__", _LOGOS["M"])
+                .replace("__LOGO_R__", _LOGOS["R"]))
 
 _hrep("\n</body>\n</html>", _EXTRA + "\n</body>\n</html>")
 

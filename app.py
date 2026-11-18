@@ -3101,7 +3101,8 @@ import json
 
 YEAR_LEVELS = ("1st Year", "2nd Year", "3rd Year", "4th Year", "5th Year")
 MR_STUDENT_KEYS = ("name", "birthday", "gender", "civilStatus", "religion",
-                   "nationality", "department", "course", "address", "contact")
+                   "nationality", "department", "course", "address", "contact",
+                   "emName", "emAddress", "emContact")
 
 
 # ---------- DATABASE: year_level + medical_records ----------
@@ -3125,6 +3126,8 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    for col in ("em_name", "em_address", "em_contact"):
+        cur.execute(f"ALTER TABLE medical_records ADD COLUMN IF NOT EXISTS {col} TEXT")
     conn.commit()
     cur.close()
 
@@ -3183,6 +3186,9 @@ def _mr_clean_student(d, strict):
     out["contact"] = re.sub(r"[\s-]", "", out["contact"])
     if not re.fullmatch(r"(09|\+639)\d{9}", out["contact"]):
         return out, "Invalid contact number."
+    out["emContact"] = re.sub(r"[\s-]", "", out["emContact"])
+    if not re.fullmatch(r"(09|\+639)\d{9}", out["emContact"]):
+        return out, "Invalid emergency contact number."
     return out, None
 
 
@@ -3208,14 +3214,16 @@ def _mr_load(cur, uid):
         return None
     cur.execute("""
         SELECT name, birthday, gender, civil_status, religion, nationality, department,
-               course, address, contact, nurse_data, submitted_at
+               course, address, contact, nurse_data, submitted_at,
+               em_name, em_address, em_contact
         FROM medical_records WHERE user_id = %s
     """, (uid,))
     r = cur.fetchone()
     if r:
         stu = {"name": r[0], "birthday": r[1], "gender": r[2], "civilStatus": r[3],
                "religion": r[4], "nationality": r[5], "department": r[6],
-               "course": r[7], "address": r[8], "contact": r[9]}
+               "course": r[7], "address": r[8], "contact": r[9],
+               "emName": r[12], "emAddress": r[13], "emContact": r[14]}
         try:
             nurse = json.loads(r[10] or "{}")
         except ValueError:
@@ -3225,7 +3233,8 @@ def _mr_load(cur, uid):
         # wala pang record: i-prefill mula sa Create Account
         stu = {"name": u[1], "birthday": u[3], "gender": u[8], "civilStatus": u[4],
                "religion": u[6], "nationality": u[9], "department": "",
-               "course": u[7], "address": u[5], "contact": u[10]}
+               "course": u[7], "address": u[5], "contact": u[10],
+               "emName": "", "emAddress": "", "emContact": ""}
         nurse, submitted = {}, False
     stu = {k: (v or "") for k, v in stu.items()}
     age = ""
@@ -3239,12 +3248,17 @@ def _mr_load(cur, uid):
 
 
 _MR_COLS = ("name, birthday, gender, civil_status, religion, nationality, "
-            "department, course, address, contact")
+            "department, course, address, contact, em_name, em_address, em_contact")
+
+
+def _ph(n):
+    return ", ".join(["%s"] * n)
 
 
 def _mr_student_params(s):
     return (s["name"], s["birthday"], s["gender"], s["civilStatus"], s["religion"],
-            s["nationality"], s["department"], s["course"], s["address"], s["contact"])
+            s["nationality"], s["department"], s["course"], s["address"], s["contact"],
+            s["emName"], s["emAddress"], s["emContact"])
 
 
 # ---------- BACKEND: STUDENT (sariling record) ----------
@@ -3282,12 +3296,14 @@ def mr_me_save():
             return jsonify(error="Medical record is for 1st year students only."), 403
         cur.execute(f"""
             INSERT INTO medical_records (user_id, {_MR_COLS}, submitted_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+            VALUES (%s, {_ph(13)}, NOW(), NOW())
             ON CONFLICT (user_id) DO UPDATE SET
                 name = EXCLUDED.name, birthday = EXCLUDED.birthday, gender = EXCLUDED.gender,
                 civil_status = EXCLUDED.civil_status, religion = EXCLUDED.religion,
                 nationality = EXCLUDED.nationality, department = EXCLUDED.department,
                 course = EXCLUDED.course, address = EXCLUDED.address, contact = EXCLUDED.contact,
+                em_name = EXCLUDED.em_name, em_address = EXCLUDED.em_address,
+                em_contact = EXCLUDED.em_contact,
                 submitted_at = COALESCE(medical_records.submitted_at, NOW()),
                 updated_at = NOW()
         """, (g.user["id"],) + _mr_student_params(stu))
@@ -3357,12 +3373,14 @@ def mr_nurse_save(uid):
             return jsonify(error="Student not found."), 404
         cur.execute(f"""
             INSERT INTO medical_records (user_id, {_MR_COLS}, nurse_data, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            VALUES (%s, {_ph(13)}, %s, NOW())
             ON CONFLICT (user_id) DO UPDATE SET
                 name = EXCLUDED.name, birthday = EXCLUDED.birthday, gender = EXCLUDED.gender,
                 civil_status = EXCLUDED.civil_status, religion = EXCLUDED.religion,
                 nationality = EXCLUDED.nationality, department = EXCLUDED.department,
                 course = EXCLUDED.course, address = EXCLUDED.address, contact = EXCLUDED.contact,
+                em_name = EXCLUDED.em_name, em_address = EXCLUDED.em_address,
+                em_contact = EXCLUDED.em_contact,
                 nurse_data = EXCLUDED.nurse_data, updated_at = NOW()
         """, (uid,) + _mr_student_params(stu) + (json.dumps(nurse),))
         conn.commit()
@@ -3436,13 +3454,22 @@ _MR_EXTRA = r'''
 .mr-pg{position:absolute;right:30px;bottom:14px;font-family:Georgia,serif;font-size:14px}
 .mr-center{text-align:center;line-height:1.3;font-family:Georgia,serif}
 .mr-dent{display:flex;gap:14px;align-items:flex-start;margin-top:8px}
-.mr-legend{width:36%;font-family:Georgia,serif;font-size:10.5px;line-height:1.25;flex-shrink:0}
+.mr-legend{width:30%;font-family:Georgia,serif;font-size:10.5px;line-height:1.25;flex-shrink:0}
 .mr-legend div{display:flex;gap:8px;margin-bottom:2px}.mr-legend b{width:26px;flex-shrink:0}
 .mr-chart{border-collapse:collapse;width:100%;table-layout:fixed;font-size:10px}
 .mr-chart th,.mr-chart td{border:1px solid #444;text-align:center;padding:0}
 .mr-chart th{font-size:10px;background:#f3f4f6}
 .mr-chart th.sub{background:#fff;font-size:9px;letter-spacing:.1em}
-.mr-chart .mr-cell{height:34px}
+.mr-chart{min-width:560px}
+.mr-chart td.sp{border:0;background:none}
+.mr-chart td.lab{font-size:8px;font-weight:700;line-height:1.15;background:#fff}
+.mr-chart td.lbl{font-size:8px;font-weight:700;letter-spacing:.08em;background:#fff;height:12px}
+.mr-chart td.ltr{font-weight:700;font-size:9px;height:14px}
+.mr-chart .mr-cell{height:24px;font-size:10px;font-weight:700}
+.mr-chart .mr-tooth{height:32px;background-repeat:no-repeat;background-position:center;background-size:78% auto}
+.mr-chart .t-m{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='16' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M20 5V35M5 20H35' stroke='black' stroke-width='1.6'/%3E%3C/svg%3E")}
+.mr-chart .t-p{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='16' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M9 20H31' stroke='black' stroke-width='1.6'/%3E%3C/svg%3E")}
+.mr-chart .t-i{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cellipse cx='20' cy='20' rx='17' ry='11' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M12 21Q20 27 28 21' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E")}
 .mr-tp{border-collapse:collapse;font-family:Georgia,serif;font-size:11px;margin:6px 0 10px}
 .mr-tp td{border:1px solid #444;height:19px;min-width:90px;padding:0 3px}
 .mr-tp td.nm{border:0;text-align:right;padding-right:8px;min-width:150px}
@@ -3462,7 +3489,7 @@ _MR_EXTRA = r'''
 (function () {
     const $ = id => document.getElementById(id);
     const LOGO_L = '__MR_LOGO_L__', LOGO_M = '__MR_LOGO_M__', LOGO_R = '__MR_LOGO_R__';
-    const STU_KEYS = ['name', 'birthday', 'gender', 'civilStatus', 'religion', 'nationality', 'department', 'course', 'address', 'contact'];
+    const STU_KEYS = ['name', 'birthday', 'gender', 'civilStatus', 'religion', 'nationality', 'department', 'course', 'address', 'contact', 'emName', 'emAddress', 'emContact'];
     let mrMe = null, cur = null, list = [], gate = false;
 
     const PRIV = 'DATA PRIVACY NOTICE: This form is owned and managed by SLSU-JGE&#39;s Health Services Unit (HSU) and may collect your personal information which includes your full name and email address. The Info Unit shall process your personal information solely for the purpose mentioned herein, in compliance with the Data Privacy Act of 2012 (&quot;Act&quot;), its Implementing Rules and Regulations, its issuances and releases, and this Privacy Notice. The Info Unit shall retain your personal information as long as necessary and shall be stored in secured storage locations with only authorized personnel having access to it. As a respondent, we understand and uphold your rights under the Act. For any concerns or inquiries, please send an email to nursekrista_slsujge@slsu.edu.ph';
@@ -3527,6 +3554,10 @@ _MR_EXTRA = r'''
                 fld('Course to apply for', 'mrs_course', 'text') +
                 fld('Address', 'mrs_address', 'text', 'sm:col-span-2') +
                 fld('Contact#', 'mrs_contact', 'tel') +
+                '<div class="sm:col-span-2 font-semibold text-gray-700 mt-2 pt-3 border-t border-gray-200">In Case of Emergency please notify:</div>' +
+                fld('Parents/Guardian', 'mrs_emName', 'text', 'sm:col-span-2') +
+                fld('Address', 'mrs_emAddress', 'text', 'sm:col-span-2') +
+                fld('Contact#', 'mrs_emContact', 'tel') +
             '</div>' +
             '<p id="mrStuMsg" class="mt-3 text-sm font-medium"></p>' +
             '<div class="flex flex-wrap justify-end gap-2 mt-5">' +
@@ -3553,6 +3584,7 @@ _MR_EXTRA = r'''
         set('mrs_gender', s.gender); set('mrs_civil', s.civilStatus); set('mrs_religion', s.religion);
         set('mrs_nationality', s.nationality); set('mrs_department', s.department);
         set('mrs_course', s.course); set('mrs_address', s.address); set('mrs_contact', s.contact);
+        set('mrs_emName', s.emName); set('mrs_emAddress', s.emAddress); set('mrs_emContact', s.emContact);
         $('mrStuMsg').textContent = '';
         $('mrStuNote').textContent = gate
             ? 'As a 1st Year student, please complete your Medical Record before using the clinic system.'
@@ -3568,12 +3600,14 @@ _MR_EXTRA = r'''
         const data = {
             name: v('mrs_name'), birthday: v('mrs_birthday'), gender: v('mrs_gender'), civilStatus: v('mrs_civil'),
             religion: v('mrs_religion'), nationality: v('mrs_nationality'), department: v('mrs_department'),
-            course: v('mrs_course'), address: v('mrs_address'), contact: v('mrs_contact')
+            course: v('mrs_course'), address: v('mrs_address'), contact: v('mrs_contact'),
+            emName: v('mrs_emName'), emAddress: v('mrs_emAddress'), emContact: v('mrs_emContact')
         };
         const msg = $('mrStuMsg');
         msg.className = 'mt-3 text-sm font-medium text-orange-600';
         if (STU_KEYS.some(k => !data[k])) { msg.textContent = 'Please fill in all fields.'; return; }
         if (!/^(09|\+639)\d{9}$/.test(data.contact.replace(/[\s-]/g, ''))) { msg.textContent = 'Enter a valid contact number (e.g. 09123456789).'; return; }
+        if (!/^(09|\+639)\d{9}$/.test(data.emContact.replace(/[\s-]/g, ''))) { msg.textContent = 'Enter a valid emergency contact number (e.g. 09123456789).'; return; }
 
         const btn = $('mrStuSubmit');
         btn.disabled = true; btn.classList.add('opacity-60', 'cursor-not-allowed');
@@ -3666,12 +3700,30 @@ _MR_EXTRA = r'''
     }
 
     function page2() {
-        const NUMS = [8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8];
-        const numRow = '<tr>' + NUMS.map(n => '<th>' + n + '</th>').join('') + '</tr>';
-        const cells = p => '<tr>' + NUMS.map((n, i) => '<td class="mr-cell" contenteditable="true" data-k="' + p + i + '"></td>').join('') + '</tr>';
-        const chart = '<table class="mr-chart"><tr><th colspan="8">RIGHT</th><th colspan="8">LEFT</th></tr>' +
-            '<tr><th colspan="16" class="sub">UPPER</th></tr>' + numRow + cells('tu') + cells('tl') + numRow +
-            '<tr><th colspan="16" class="sub">LOWER</th></tr></table>';
+        const PERM = [8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8];
+        const pcls = n => n >= 6 ? 't-m' : (n >= 4 ? 't-p' : 't-i');
+        const DEC = ['t-m', 't-m', 't-i', 't-i', 't-i', 't-i', 't-i', 't-i', 't-m', 't-m'];
+        const rng = (n, f) => Array.from({ length: n }, (_, i) => f(i)).join('');
+        const N = k => '<td class="mr-cell" contenteditable="true" data-k="' + k + '"></td>';
+        const T = (c, k) => '<td class="mr-cell mr-tooth ' + c + '" contenteditable="true" data-k="' + k + '"></td>';
+        const sp = c => '<td class="sp" colspan="' + c + '"></td>';
+        const lab = (t, rs) => '<td class="lab" colspan="2" rowspan="' + rs + '">' + t + '</td>';
+        const L = arr => arr.map(c => '<td class="ltr">' + c + '</td>').join('');
+        const numRow = '<tr>' + PERM.map(n => '<th>' + n + '</th>').join('') + '</tr>';
+        const chart = '<table class="mr-chart">' +
+            '<tr>' + rng(16, i => N('pa' + i)) + '</tr>' + numRow +
+            '<tr>' + PERM.map((n, i) => T(pcls(n), 'tu' + i)).join('') + '</tr>' +
+            '<tr><td class="lbl" colspan="16">LABIAL</td></tr>' +
+            '<tr>' + sp(1) + lab('RIGHT<br>UPPER', 2) + rng(10, i => N('du' + i)) + lab('LEFT<br>UPPER', 2) + sp(1) + '</tr>' +
+            '<tr>' + sp(1) + rng(10, i => T(DEC[i], 'dt' + i)) + sp(1) + '</tr>' +
+            '<tr>' + sp(3) + L(['E', 'D', 'C', 'B']) + '<td class="lbl" colspan="2">LINGUAL</td>' + L(['B', 'C', 'D', 'E']) + sp(3) + '</tr>' +
+            '<tr>' + sp(3) + L(['E', 'D', 'C', 'B', 'A', 'A', 'B', 'C', 'D', 'E']) + sp(3) + '</tr>' +
+            '<tr>' + sp(7) + '<td class="lbl" colspan="2">LINGUAL</td>' + sp(7) + '</tr>' +
+            '<tr>' + sp(1) + lab('RIGHT<br>LOWER', 2) + rng(10, i => T(DEC[i], 'dl' + i)) + lab('LEFT<br>LOWER', 2) + sp(1) + '</tr>' +
+            '<tr>' + sp(1) + rng(10, i => N('dn' + i)) + sp(1) + '</tr>' +
+            '<tr>' + PERM.map((n, i) => T(pcls(n), 'tl' + i)).join('') + '</tr>' +
+            '<tr><td class="lbl" colspan="16">LABIAL</td></tr>' + numRow +
+            '<tr>' + rng(16, i => N('pb' + i)) + '</tr></table>';
 
         const LEG = [['C', 'Dental Caries'], ['C1', 'Dental Caries with Vital Pulp Exposed'], ['C2', 'Dental Caries with Non Vital Pulp Exposed'],
             ['X', 'Indicated for Extraction'], ['RF', 'Retained Root Fragment'], ['AM', 'Amalgam Filling'], ['S', 'Silicate Filling'],
@@ -3882,7 +3934,7 @@ _MR_EXTRA = r'''
             '@page{size:8.5in 11in;margin:.4in}html,body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
             '.mr-paper{box-shadow:none;border:0;max-width:none;width:100%;margin:0;padding:0 .15in .3in;font-size:12px;line-height:1.7;page-break-after:always;min-height:0}' +
             '.mr-paper:last-child{page-break-after:auto}.mr-ro{background:none}.mr-pg{bottom:0}' +
-            '.mr-head img{height:60px}.mr-title{margin:12px 0 6px}.mr-chart .mr-cell{height:30px}.mr-sv td{height:20px}' +
+            '.mr-head img{height:60px}.mr-title{margin:12px 0 6px}.mr-chart{min-width:0}.mr-chart .mr-cell{height:20px}.mr-chart .mr-tooth{height:26px}.mr-sv td{height:20px}' +
             '</style></head><body>' + wrap.innerHTML + '</body></html>');
         w.document.close(); w.focus();
         setTimeout(() => w.print(), 600);

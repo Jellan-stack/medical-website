@@ -3091,6 +3091,854 @@ _EXTRA = (_EXTRA.replace("__LOGO_L__", _LOGOS["L"])
                 .replace("__LOGO_R__", _LOGOS["R"]))
 
 _hrep("\n</body>\n</html>", _EXTRA + "\n</body>\n</html>")
+# =====================================================================
+# MEDICAL RECORD (1st YEAR) + YEAR LEVEL
+# I-PASTE ang BUONG block na ito sa app.py, ISANG BESES LANG, mismo bago ang linyang:
+#     # ===================== TAPOS NA ANG CLINIC UPDATE =====================
+# (nasa ibaba ng  _hrep("\n</body>\n</html>", _EXTRA + "\n</body>\n</html>")  )
+# =====================================================================
+import json
+
+YEAR_LEVELS = ("1st Year", "2nd Year", "3rd Year", "4th Year", "5th Year")
+MR_STUDENT_KEYS = ("name", "birthday", "gender", "civilStatus", "religion",
+                   "nationality", "department", "course", "address", "contact")
+
+
+# ---------- DATABASE: year_level + medical_records ----------
+_init_db_v3 = init_db
+
+
+def init_db():
+    _init_db_v3()
+    conn = get_db()
+    if not conn:
+        return
+    cur = conn.cursor()
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS year_level TEXT")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS medical_records (
+            user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT, birthday TEXT, gender TEXT, civil_status TEXT, religion TEXT,
+            nationality TEXT, department TEXT, course TEXT, address TEXT, contact TEXT,
+            nurse_data TEXT DEFAULT '{}',
+            submitted_at TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    cur.close()
+
+
+# ---------- BACKEND: Create Account na may Year Level ----------
+_register_v2 = app.view_functions["register"]
+
+
+def register_v3():
+    data = request.get_json(silent=True) or {}
+    role = data.get("role") or ""
+    year = (data.get("yearLevel") or "").strip()
+    if role == "Student" and year not in YEAR_LEVELS:
+        return jsonify(error="Please select your year level."), 400
+
+    result = _register_v2()
+    resp, status = result if isinstance(result, tuple) else (result, 200)
+
+    if status == 201 and role == "Student":
+        conn = get_db()
+        if conn:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "UPDATE users SET year_level = %s WHERE email = %s",
+                    (year, (data.get("email") or "").strip().lower()),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+            finally:
+                cur.close()
+    return resp, status
+
+
+app.view_functions["register"] = register_v3
+
+
+# ---------- BACKEND: helpers ----------
+def _mr_clean_student(d, strict):
+    out = {k: str(d.get(k) or "").strip()[:200] for k in MR_STUDENT_KEYS}
+    if not strict:
+        return out, None
+    if not all(out.values()):
+        return out, "Please fill in all fields."
+    try:
+        age = calc_age(datetime.strptime(out["birthday"], "%Y-%m-%d").date())
+    except ValueError:
+        return out, "Invalid birthday."
+    if age < 5 or age > 100:
+        return out, "Invalid birthday."
+    if out["civilStatus"] not in CIVIL_STATUSES:
+        return out, "Invalid civil status."
+    if out["gender"] not in ("Male", "Female"):
+        return out, "Invalid gender."
+    out["contact"] = re.sub(r"[\s-]", "", out["contact"])
+    if not re.fullmatch(r"(09|\+639)\d{9}", out["contact"]):
+        return out, "Invalid contact number."
+    return out, None
+
+
+def _mr_clean_nurse(d):
+    if not isinstance(d, dict):
+        return {}
+    out = {}
+    for k, v in list(d.items())[:600]:
+        k = str(k)[:40]
+        if re.fullmatch(r"[A-Za-z0-9_]+", k):
+            out[k] = str(v)[:500]
+    return out
+
+
+def _mr_load(cur, uid):
+    cur.execute("""
+        SELECT id, name, role, birthday, civil_status, address, religion, course,
+               gender, nationality, contact, year_level
+        FROM users WHERE id = %s
+    """, (uid,))
+    u = cur.fetchone()
+    if u is None:
+        return None
+    cur.execute("""
+        SELECT name, birthday, gender, civil_status, religion, nationality, department,
+               course, address, contact, nurse_data, submitted_at
+        FROM medical_records WHERE user_id = %s
+    """, (uid,))
+    r = cur.fetchone()
+    if r:
+        stu = {"name": r[0], "birthday": r[1], "gender": r[2], "civilStatus": r[3],
+               "religion": r[4], "nationality": r[5], "department": r[6],
+               "course": r[7], "address": r[8], "contact": r[9]}
+        try:
+            nurse = json.loads(r[10] or "{}")
+        except ValueError:
+            nurse = {}
+        submitted = r[11] is not None
+    else:
+        # wala pang record: i-prefill mula sa Create Account
+        stu = {"name": u[1], "birthday": u[3], "gender": u[8], "civilStatus": u[4],
+               "religion": u[6], "nationality": u[9], "department": "",
+               "course": u[7], "address": u[5], "contact": u[10]}
+        nurse, submitted = {}, False
+    stu = {k: (v or "") for k, v in stu.items()}
+    age = ""
+    try:
+        age = calc_age(datetime.strptime(stu["birthday"], "%Y-%m-%d").date())
+    except ValueError:
+        pass
+    stu["age"] = age
+    return {"userId": u[0], "role": u[2], "yearLevel": u[11] or "",
+            "submitted": submitted, "student": stu, "nurse": nurse}
+
+
+_MR_COLS = ("name, birthday, gender, civil_status, religion, nationality, "
+            "department, course, address, contact")
+
+
+def _mr_student_params(s):
+    return (s["name"], s["birthday"], s["gender"], s["civilStatus"], s["religion"],
+            s["nationality"], s["department"], s["course"], s["address"], s["contact"])
+
+
+# ---------- BACKEND: STUDENT (sariling record) ----------
+def mr_me_get():
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+    cur = conn.cursor()
+    try:
+        rec = _mr_load(cur, g.user["id"])
+        rec["required"] = g.user["role"] == "Student" and rec["yearLevel"] == "1st Year"
+        return jsonify(rec), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
+
+def mr_me_save():
+    if g.user["role"] != "Student":
+        return jsonify(error="Students only."), 403
+    data = request.get_json(silent=True) or {}
+    stu, err = _mr_clean_student(data, strict=True)
+    if err:
+        return jsonify(error=err), 400
+
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT year_level FROM users WHERE id = %s", (g.user["id"],))
+        row = cur.fetchone()
+        if not row or row[0] != "1st Year":
+            return jsonify(error="Medical record is for 1st year students only."), 403
+        cur.execute(f"""
+            INSERT INTO medical_records (user_id, {_MR_COLS}, submitted_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+            ON CONFLICT (user_id) DO UPDATE SET
+                name = EXCLUDED.name, birthday = EXCLUDED.birthday, gender = EXCLUDED.gender,
+                civil_status = EXCLUDED.civil_status, religion = EXCLUDED.religion,
+                nationality = EXCLUDED.nationality, department = EXCLUDED.department,
+                course = EXCLUDED.course, address = EXCLUDED.address, contact = EXCLUDED.contact,
+                submitted_at = COALESCE(medical_records.submitted_at, NOW()),
+                updated_at = NOW()
+        """, (g.user["id"],) + _mr_student_params(stu))
+        conn.commit()
+        return jsonify(message="Medical record submitted."), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
+
+# ---------- BACKEND: NURSE ----------
+def mr_list():
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT u.id, u.name, COALESCE(m.course, u.course),
+                   (m.submitted_at IS NOT NULL),
+                   to_char(m.submitted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila', 'Mon DD, YYYY')
+            FROM users u
+            LEFT JOIN medical_records m ON m.user_id = u.id
+            WHERE u.role = 'Student' AND u.year_level = '1st Year'
+            ORDER BY (m.submitted_at IS NULL) ASC, u.name ASC
+        """)
+        students = [{"id": r[0], "name": r[1], "course": r[2] or "",
+                     "submitted": r[3], "submittedAt": r[4]} for r in cur.fetchall()]
+        return jsonify(students=students), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
+
+def mr_nurse_get(uid):
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+    cur = conn.cursor()
+    try:
+        rec = _mr_load(cur, uid)
+        if rec is None or rec["role"] != "Student":
+            return jsonify(error="Student not found."), 404
+        return jsonify(rec), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
+
+def mr_nurse_save(uid):
+    data = request.get_json(silent=True) or {}
+    stu, _err = _mr_clean_student(data.get("student") or {}, strict=False)
+    nurse = _mr_clean_nurse(data.get("nurse") or {})
+
+    conn = get_db()
+    if not conn:
+        return jsonify(error="Database connection failed."), 500
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT role FROM users WHERE id = %s", (uid,))
+        row = cur.fetchone()
+        if not row or row[0] != "Student":
+            return jsonify(error="Student not found."), 404
+        cur.execute(f"""
+            INSERT INTO medical_records (user_id, {_MR_COLS}, nurse_data, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET
+                name = EXCLUDED.name, birthday = EXCLUDED.birthday, gender = EXCLUDED.gender,
+                civil_status = EXCLUDED.civil_status, religion = EXCLUDED.religion,
+                nationality = EXCLUDED.nationality, department = EXCLUDED.department,
+                course = EXCLUDED.course, address = EXCLUDED.address, contact = EXCLUDED.contact,
+                nurse_data = EXCLUDED.nurse_data, updated_at = NOW()
+        """, (uid,) + _mr_student_params(stu) + (json.dumps(nurse),))
+        conn.commit()
+        return jsonify(message="Medical record saved."), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify(error=str(e)), 500
+    finally:
+        cur.close()
+
+
+app.add_url_rule("/api/medrec/me", "mr_me_get", login_required(mr_me_get), methods=["GET"])
+app.add_url_rule("/api/medrec/me", "mr_me_save", login_required(mr_me_save), methods=["POST"])
+app.add_url_rule("/api/medrec", "mr_list", nurse_required(mr_list), methods=["GET"])
+app.add_url_rule("/api/medrec/<int:uid>", "mr_nurse_get", nurse_required(mr_nurse_get), methods=["GET"])
+app.add_url_rule("/api/medrec/<int:uid>", "mr_nurse_save", nurse_required(mr_nurse_save), methods=["POST"])
+
+
+# ---------- FRONTEND: Year Level sa Create Account ----------
+_YEAR_OPTS = "".join(f"<option>{y}</option>" for y in YEAR_LEVELS)
+_hrep(
+    f'<div><label class="{_LBL}">Contact #</label>',
+    f'<div id="regYearWrap"><label class="{_LBL}">Year Level</label>'
+    f'<select id="regYear" class="{_INP}"><option value="">Select...</option>{_YEAR_OPTS}</select></div>\n'
+    f'            <div><label class="{_LBL}">Contact #</label>',
+)
+_hrep("if (missing || badPhone) {",
+      "const noYear = role === 'Student' && !document.getElementById('regYear').value;\n"
+      "        if (missing || badPhone || noYear) {")
+_hrep("m0.textContent = missing ? 'Please fill in all personal information!' : 'Enter a valid contact number (e.g. 09123456789).';",
+      "m0.textContent = (noYear && !missing && !badPhone) ? 'Please select your year level!' : "
+      "(missing ? 'Please fill in all personal information!' : 'Enter a valid contact number (e.g. 09123456789).');")
+_hrep("body: JSON.stringify({ name, email, password: pass, role, ...profile })",
+      "body: JSON.stringify({ name, email, password: pass, role, ...profile, "
+      "yearLevel: (role === 'Student' ? document.getElementById('regYear').value : '') })")
+
+
+# ---------- FRONTEND: Medical Record (student form + nurse panel + print) ----------
+_MR_EXTRA = r'''
+<style id="mrStyle">
+.mr-paper{background:#fff;color:#111;font-family:Verdana,Geneva,sans-serif;font-size:14px;line-height:1.9;padding:24px 50px 40px;max-width:820px;margin:0 auto 24px;position:relative;box-shadow:0 4px 24px rgba(0,0,0,.12);border:1px solid #e5e7eb;box-sizing:border-box}
+.mr-head{display:flex;align-items:center;gap:10px}
+.mr-head .lg{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.mr-head img{height:64px;width:auto;display:block}
+.mr-head .tx{flex:1;min-width:0;line-height:1.25}
+.mr-head .u{font-size:21px;font-weight:800;letter-spacing:.3px}
+.mr-head .s{font-size:14px}
+.mr-head .em{font-family:Georgia,serif;font-size:11px;margin-left:34px;color:#444}
+.mr-title{text-align:center;font-weight:700;font-size:16px;margin:18px 0 10px}
+.mr-sec{text-align:center;margin:14px 0 4px}
+.mr-sub{margin-top:6px}
+.mr-indent{padding-left:44px}
+.mr-row{display:flex;flex-wrap:wrap;gap:2px 22px;align-items:baseline;margin-bottom:4px}
+.mr-it{display:flex;align-items:baseline;gap:4px;flex:1 1 190px;min-width:0}
+.mr-it.w2{flex:2 1 330px}.mr-it.full{flex:1 1 100%}
+.mr-it>label{white-space:nowrap}
+.mr-f{flex:1;min-width:40px;border-bottom:1px solid #222;padding:0 4px;outline:none;min-height:1.5em;word-break:break-word;line-height:1.5;display:inline-block}
+.mr-f[contenteditable="true"]:focus,.mr-cell:focus{background:#eff6ff}
+.mr-ro{background:#f8fafc}
+.mr-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 18px}
+.mr-ck{display:flex;justify-content:space-between;gap:6px;cursor:pointer;-webkit-user-select:none;user-select:none}
+.mr-ck b{font-weight:400}
+.mr-ck .bx{white-space:pre}
+.mr-ck .bx:before{content:'(    )'}
+.mr-ck.on .bx:before{content:'( ✓ )';font-weight:700}
+.mr-ck.in{display:inline-flex;justify-content:flex-start;margin-right:34px}
+.mr-foot2{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-top:26px}
+.mr-sigline{width:240px;border-top:1px solid #222;text-align:center;margin-top:30px}
+.mr-priv{font-family:Arial,Helvetica,sans-serif;font-size:8px;line-height:1.3;margin-top:16px;font-weight:600}
+.mr-code{font-family:Georgia,serif;font-style:italic;font-size:12px;line-height:1.3;margin-top:10px}
+.mr-pg{position:absolute;right:30px;bottom:14px;font-family:Georgia,serif;font-size:14px}
+.mr-center{text-align:center;line-height:1.3;font-family:Georgia,serif}
+.mr-dent{display:flex;gap:14px;align-items:flex-start;margin-top:8px}
+.mr-legend{width:36%;font-family:Georgia,serif;font-size:10.5px;line-height:1.25;flex-shrink:0}
+.mr-legend div{display:flex;gap:8px;margin-bottom:2px}.mr-legend b{width:26px;flex-shrink:0}
+.mr-chart{border-collapse:collapse;width:100%;table-layout:fixed;font-size:10px}
+.mr-chart th,.mr-chart td{border:1px solid #444;text-align:center;padding:0}
+.mr-chart th{font-size:10px;background:#f3f4f6}
+.mr-chart th.sub{background:#fff;font-size:9px;letter-spacing:.1em}
+.mr-chart .mr-cell{height:34px}
+.mr-tp{border-collapse:collapse;font-family:Georgia,serif;font-size:11px;margin:6px 0 10px}
+.mr-tp td{border:1px solid #444;height:19px;min-width:90px;padding:0 3px}
+.mr-tp td.nm{border:0;text-align:right;padding-right:8px;min-width:150px}
+.mr-sv{border-collapse:collapse;width:100%;table-layout:fixed;font-size:11px;font-family:Georgia,serif}
+.mr-sv th,.mr-sv td{border:1px solid #444;height:22px;padding:0 3px}
+.mr-sv th{background:#f3f4f6}
+.mr-cell{outline:none}
+@media(max-width:700px){
+ .mr-paper{padding:14px 12px 34px;font-size:12px}
+ .mr-head img{height:34px}.mr-head .u{font-size:12px}.mr-head .s{font-size:10px}.mr-head .em{font-size:9px;margin-left:0}
+ .mr-indent{padding-left:10px}.mr-grid3{grid-template-columns:1fr}.mr-dent{flex-direction:column}.mr-legend{width:100%}
+ .mr-foot2{flex-direction:column;align-items:stretch}.mr-sigline{width:100%}
+}
+</style>
+
+<script>
+(function () {
+    const $ = id => document.getElementById(id);
+    const LOGO_L = '__MR_LOGO_L__', LOGO_M = '__MR_LOGO_M__', LOGO_R = '__MR_LOGO_R__';
+    const STU_KEYS = ['name', 'birthday', 'gender', 'civilStatus', 'religion', 'nationality', 'department', 'course', 'address', 'contact'];
+    let mrMe = null, cur = null, list = [], gate = false;
+
+    const PRIV = 'DATA PRIVACY NOTICE: This form is owned and managed by SLSU-JGE&#39;s Health Services Unit (HSU) and may collect your personal information which includes your full name and email address. The Info Unit shall process your personal information solely for the purpose mentioned herein, in compliance with the Data Privacy Act of 2012 (&quot;Act&quot;), its Implementing Rules and Regulations, its issuances and releases, and this Privacy Notice. The Info Unit shall retain your personal information as long as necessary and shall be stored in secured storage locations with only authorized personnel having access to it. As a respondent, we understand and uphold your rights under the Act. For any concerns or inquiries, please send an email to nursekrista_slsujge@slsu.edu.ph';
+
+    // Same na header/logo ng Medical Certificate
+    const HEAD = '<div class="mr-head"><div class="lg"><img src="' + LOGO_L + '" alt=""><img src="' + LOGO_M + '" alt=""></div>' +
+        '<div class="tx"><div class="u">SOUTHERN LUZON STATE UNIVERSITY</div>' +
+        '<div class="s">Judge Guillermo Eleazar Campus, Tagkawayan<br>Health Services Unit</div>' +
+        '<div class="em">nursekrista_slsujge@slsu.edu.ph</div></div>' +
+        '<div class="rg"><img src="' + LOGO_R + '" alt=""></div></div>';
+
+    function pretty(iso) {
+        if (!iso) return '';
+        try { return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
+        catch (e) { return iso; }
+    }
+    function todayPretty() { return new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
+    function ageOf(iso) {
+        if (!iso) return '';
+        const b = new Date(iso + 'T00:00:00'), t = new Date();
+        if (isNaN(b)) return '';
+        let a = t.getFullYear() - b.getFullYear();
+        const m = t.getMonth() - b.getMonth();
+        if (m < 0 || (m === 0 && t.getDate() < b.getDate())) a--;
+        return a >= 0 ? a : '';
+    }
+
+    // ================= CREATE ACCOUNT: Year Level ay para sa Student lang =================
+    document.addEventListener('DOMContentLoaded', () => {
+        const r = $('regRole'), w = $('regYearWrap');
+        if (r && w) r.addEventListener('change', () => { w.style.display = r.value === 'Student' ? '' : 'none'; });
+    });
+
+    // ================= STUDENT: MEDICAL RECORD FORM (Name -> Contact#) =================
+    function buildStudent() {
+        if ($('mrStuScreen')) return;
+        const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500';
+        const lb = 'block text-gray-600 text-sm font-medium mb-1';
+        const req = ' <span class="text-red-500">*</span>';
+        const fld = (label, id, type, extra, ro) => '<div class="' + (extra || '') + '"><label class="' + lb + '">' + label + req +
+            '</label><input type="' + type + '" id="' + id + '" class="' + inp + (ro ? ' bg-gray-100' : '') + '"' + (ro ? ' readonly' : '') + '></div>';
+        const sel = (label, id, opts) => '<div><label class="' + lb + '">' + label + req + '</label><select id="' + id + '" class="' + inp + '"><option value="">Select...</option>' +
+            opts.map(o => '<option>' + o + '</option>').join('') + '</select></div>';
+
+        const d = document.createElement('div');
+        d.id = 'mrStuScreen';
+        d.className = 'hidden fixed inset-0 overflow-auto bg-gray-50 p-3 sm:p-6';
+        d.style.zIndex = '55';
+        d.innerHTML =
+            '<div class="max-w-3xl mx-auto"><div class="dashboard-card p-4 sm:p-6">' + HEAD +
+            '<div class="mr-title">Medical Record</div>' +
+            '<p class="text-sm text-gray-500 text-center mb-5" id="mrStuNote"></p>' +
+            '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">' +
+                fld('Name', 'mrs_name', 'text', 'sm:col-span-2') +
+                fld('Birthday', 'mrs_birthday', 'date') +
+                fld('Age', 'mrs_age', 'text', '', true) +
+                sel('Gender', 'mrs_gender', ['Male', 'Female']) +
+                sel('Civil Status', 'mrs_civil', ['Single', 'Married', 'Separated', 'Widowed']) +
+                fld('Religion', 'mrs_religion', 'text') +
+                fld('Nationality', 'mrs_nationality', 'text') +
+                fld('Department', 'mrs_department', 'text') +
+                fld('Course to apply for', 'mrs_course', 'text') +
+                fld('Address', 'mrs_address', 'text', 'sm:col-span-2') +
+                fld('Contact#', 'mrs_contact', 'tel') +
+            '</div>' +
+            '<p id="mrStuMsg" class="mt-3 text-sm font-medium"></p>' +
+            '<div class="flex flex-wrap justify-end gap-2 mt-5">' +
+                '<button id="mrStuClose" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Close</button>' +
+                '<button id="mrStuLogout" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-medium"><i class="fa-solid fa-right-from-bracket mr-1"></i>Log Out</button>' +
+                '<button id="mrStuSubmit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold"><i class="fa-solid fa-paper-plane mr-1"></i>Submit Medical Record</button>' +
+            '</div>' +
+            '<div class="mr-priv">' + PRIV + '</div></div></div>';
+        document.body.appendChild(d);
+
+        $('mrs_birthday').max = new Date().toISOString().split('T')[0];
+        $('mrs_birthday').addEventListener('change', () => { $('mrs_age').value = ageOf($('mrs_birthday').value); });
+        $('mrStuClose').addEventListener('click', () => { if (!gate) $('mrStuScreen').classList.add('hidden'); });
+        $('mrStuLogout').addEventListener('click', () => logoutSystem());
+        $('mrStuSubmit').addEventListener('click', submitStu);
+    }
+
+    function openStu(isGate) {
+        buildStudent();
+        gate = !!isGate;
+        const s = mrMe.student;
+        const set = (id, v) => { $(id).value = v || ''; };
+        set('mrs_name', s.name); set('mrs_birthday', s.birthday); set('mrs_age', ageOf(s.birthday));
+        set('mrs_gender', s.gender); set('mrs_civil', s.civilStatus); set('mrs_religion', s.religion);
+        set('mrs_nationality', s.nationality); set('mrs_department', s.department);
+        set('mrs_course', s.course); set('mrs_address', s.address); set('mrs_contact', s.contact);
+        $('mrStuMsg').textContent = '';
+        $('mrStuNote').textContent = gate
+            ? 'As a 1st Year student, please complete your Medical Record before using the clinic system.'
+            : 'You may update your information below, then submit again.';
+        $('mrStuClose').style.display = gate ? 'none' : '';
+        $('mrStuLogout').style.display = gate ? '' : 'none';
+        $('mrStuScreen').classList.remove('hidden');
+    }
+    window.mrOpenStu = () => openStu(false);
+
+    async function submitStu() {
+        const v = id => $(id).value.trim();
+        const data = {
+            name: v('mrs_name'), birthday: v('mrs_birthday'), gender: v('mrs_gender'), civilStatus: v('mrs_civil'),
+            religion: v('mrs_religion'), nationality: v('mrs_nationality'), department: v('mrs_department'),
+            course: v('mrs_course'), address: v('mrs_address'), contact: v('mrs_contact')
+        };
+        const msg = $('mrStuMsg');
+        msg.className = 'mt-3 text-sm font-medium text-orange-600';
+        if (STU_KEYS.some(k => !data[k])) { msg.textContent = 'Please fill in all fields.'; return; }
+        if (!/^(09|\+639)\d{9}$/.test(data.contact.replace(/[\s-]/g, ''))) { msg.textContent = 'Enter a valid contact number (e.g. 09123456789).'; return; }
+
+        const btn = $('mrStuSubmit');
+        btn.disabled = true; btn.classList.add('opacity-60', 'cursor-not-allowed');
+        try {
+            await api('/api/medrec/me', { method: 'POST', body: JSON.stringify(data) });
+            mrMe.submitted = true;
+            mrMe.student = Object.assign({}, data, { age: ageOf(data.birthday) });
+            $('mrStuScreen').classList.add('hidden');
+            gate = false;
+            renderCard();
+            alert('Medical record submitted!');
+        } catch (e) {
+            msg.className = 'mt-3 text-sm font-medium text-red-600';
+            msg.textContent = e.message;
+        } finally {
+            btn.disabled = false; btn.classList.remove('opacity-60', 'cursor-not-allowed');
+        }
+    }
+
+    function renderCard() {
+        const main = document.querySelector('#userDashboard main');
+        if (!main || !mrMe) return;
+        let c = $('mrCard');
+        if (!c) {
+            c = document.createElement('div');
+            c.id = 'mrCard';
+            c.className = 'dashboard-card p-4 mb-6 fade-in flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+            main.children[0].insertAdjacentElement('afterend', c);
+        }
+        c.innerHTML =
+            '<div class="flex items-center gap-3"><div class="w-11 h-11 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center"><i class="fa-solid fa-notes-medical"></i></div>' +
+            '<div><div class="font-bold text-gray-800">Medical Record</div>' +
+            '<div class="text-sm ' + (mrMe.submitted ? 'text-green-600' : 'text-orange-600') + '">' +
+            (mrMe.submitted ? '<i class="fa-solid fa-circle-check mr-1"></i>Submitted' : 'Not yet submitted') + '</div></div></div>' +
+            '<button onclick="mrOpenStu()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">' +
+            (mrMe.submitted ? 'View / Update' : 'Fill Up Now') + '</button>';
+    }
+
+    async function initStudent() {
+        const old = $('mrCard'); if (old) old.remove();
+        let d;
+        try { d = await api('/api/medrec/me'); } catch (e) { return; }
+        if (!d.required) return;
+        mrMe = d;
+        renderCard();
+        if (!d.submitted) openStu(true);
+    }
+
+    // ================= NURSE: FULL MEDICAL RECORD (Page 1 + Page 2) =================
+    const F = (k, ro, cls) => '<span class="mr-f' + (ro ? ' mr-ro' : '') + (cls ? ' ' + cls : '') + '" data-k="' + k + '"' + (ro ? '' : ' contenteditable="true"') + '></span>';
+    const IT = (label, k, cls, ro) => '<div class="mr-it ' + (cls || '') + '"><label>' + label + '</label>' + F(k, ro) + '</div>';
+    const IM = (label, k, cls) => '<div class="mr-it ' + (cls || '') + '"><label>' + label + '</label><span class="mr-f mr-ro" data-m="' + k + '"></span></div>';
+    const ROW = h => '<div class="mr-row">' + h + '</div>';
+    const CK = (label, k, inl) => '<div class="mr-ck' + (inl ? ' in' : '') + '" data-k="' + k + '"><b>' + label + '</b><span class="bx"></span></div>';
+
+    function page1() {
+        return '<div class="mr-paper" id="mrP1">' + HEAD +
+            '<div class="mr-title">Medical Record</div>' +
+            ROW(IT('Name:', 'name', 'full')) +
+            ROW(IT('Birthday:', 'birthday', '', true) + IT('Age:', 'age', '', true) + IT('Gender:', 'gender')) +
+            ROW(IT('Civil Status:', 'civilStatus') + IT('Religion:', 'religion') + IT('Nationality:', 'nationality')) +
+            ROW(IT('Department:', 'department') + IT('Course to apply for:', 'course')) +
+            ROW(IT('Address:', 'address', 'w2') + IT('Contact#:', 'contact')) +
+            '<div class="mr-sub">In Case of Emergency please notify:</div>' +
+            '<div class="mr-indent">' +
+                ROW(IT('Parents/Guardian:', 'emName', 'full')) +
+                ROW(IT('Address:', 'emAddress', 'full')) +
+                ROW(IT('Contact#:', 'emContact', 'full')) +
+            '</div>' +
+            '<div class="mr-sec">Vital Signs</div>' +
+            ROW(IT('Blood Pressure:', 'bp') + IT('Temperature:', 'temp') + IT('Pulse Rate:', 'pulse')) +
+            ROW(IT('Height:', 'height') + IT('Weight:', 'weight') + IT('Respiratory Rate:', 'resp')) +
+            ROW(IT('Other Physical and/or Medical Observations:', 'obs', 'full')) +
+            '<div class="mr-sec">Past Medical History</div>' +
+            '<div class="mr-grid3">' +
+                '<div>' + CK('Hypertension', 'hx_hypertension') + CK('Asthma', 'hx_asthma') + CK('Hernia', 'hx_hernia') + CK('Goiter', 'hx_goiter') + '</div>' +
+                '<div>' + CK('Heart Disease', 'hx_heart') + CK('Diabetes', 'hx_diabetes') + CK('Ulcer', 'hx_ulcer') + CK('COPD', 'hx_copd') + '</div>' +
+                '<div>' + CK('Allergies', 'hx_allergies') + CK('Cancer', 'hx_cancer') + CK('Kidney Disease', 'hx_kidney') + CK('Liver Disease', 'hx_liver') + '</div>' +
+            '</div>' +
+            '<div class="mr-sub">Others:</div>' +
+            ROW(IT('Previous Hospitalization:', 'prevHosp', 'full')) +
+            ROW(IT('Previous Operations:', 'prevOps', 'full')) +
+            ROW(IT('Previous Trauma:', 'prevTrauma', 'full')) +
+            ROW(IT('Medicine Intakes/Vitamins:', 'meds', 'full')) +
+            '<div class="mr-sub">History of:</div>' +
+            '<div class="mr-indent mr-row" style="align-items:baseline">' + CK('Smoking', 'smoking', true) + CK('Alcoholism', 'alcohol', true) + IT('Sports:', 'sports') + '</div>' +
+            '<div class="mr-foot2"><div class="mr-it" style="max-width:300px"><label>DATE:</label>' + F('recDate') + '</div><div class="mr-sigline">Signature</div></div>' +
+            '<div class="mr-priv">' + PRIV + '</div>' +
+            '<div class="mr-code">SLSU-JGE-AFA-HSU-1.0.F2<br>Effective: 102025</div><div class="mr-pg">1</div></div>';
+    }
+
+    function page2() {
+        const NUMS = [8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8];
+        const numRow = '<tr>' + NUMS.map(n => '<th>' + n + '</th>').join('') + '</tr>';
+        const cells = p => '<tr>' + NUMS.map((n, i) => '<td class="mr-cell" contenteditable="true" data-k="' + p + i + '"></td>').join('') + '</tr>';
+        const chart = '<table class="mr-chart"><tr><th colspan="8">RIGHT</th><th colspan="8">LEFT</th></tr>' +
+            '<tr><th colspan="16" class="sub">UPPER</th></tr>' + numRow + cells('tu') + cells('tl') + numRow +
+            '<tr><th colspan="16" class="sub">LOWER</th></tr></table>';
+
+        const LEG = [['C', 'Dental Caries'], ['C1', 'Dental Caries with Vital Pulp Exposed'], ['C2', 'Dental Caries with Non Vital Pulp Exposed'],
+            ['X', 'Indicated for Extraction'], ['RF', 'Retained Root Fragment'], ['AM', 'Amalgam Filling'], ['S', 'Silicate Filling'],
+            ['GC', 'Gold Crown'], ['AB', 'Bridge Abutment'], ['P', 'Pontic'], ['U', 'Gold Clasp'], ['GI', 'Gold Inlay'],
+            ['M', 'Missing due to Extraction'], ['Un', 'Unerupted']];
+        const legend = '<div class="mr-legend"><b>Legend:</b>' + LEG.map(l => '<div><b>' + l[0] + '</b><span>' + l[1] + '</span></div>').join('') + '</div>';
+
+        const CLINICS = ['Oral Surgery Clinic', 'Operative Clinic', 'Prosthodontia Clinic', 'Crown &amp; Bridge Clinic', 'Oral Medicine Clinic',
+            'X-Ray Clinic', 'Children&#39;s Clinic', 'Orthodontia Clinic', 'Clinical Laboratory'];
+        const tp = '<table class="mr-tp">' + CLINICS.map((c, i) => '<tr><td class="nm">' + c + '</td><td class="mr-cell" contenteditable="true" data-k="tpA' + i + '"></td><td class="mr-cell" contenteditable="true" data-k="tpB' + i + '"></td></tr>').join('') + '</table>';
+
+        let sv = '<table class="mr-sv"><colgroup><col style="width:15%"><col style="width:45%"><col style="width:20%"><col style="width:20%"></colgroup><thead><tr><th>DATE</th><th>SERVICES RENDERED</th><th>Patient&#39;s Signature</th><th>Dentist&#39;s Signature</th></tr></thead><tbody>';
+        for (let r = 0; r < 14; r++) {
+            sv += '<tr>' + [0, 1, 2, 3].map(c => '<td class="mr-cell" contenteditable="true" data-k="sv' + r + '_' + c + '"></td>').join('') + '</tr>';
+        }
+        sv += '</tbody></table>';
+
+        return '<div class="mr-paper hidden" id="mrP2">' + HEAD +
+            '<div style="margin-top:10px">' +
+            ROW(IM('Name:', 'name', 'full')) +
+            ROW(IM('Birthday:', 'birthday') + IM('Age:', 'age') + IM('Gender:', 'gender')) +
+            ROW(IM('Civil Status:', 'civilStatus') + IM('Religion:', 'religion') + IM('Nationality:', 'nationality')) +
+            ROW(IM('Department:', 'department') + IM('Course:', 'course')) +
+            ROW(IM('Address:', 'address', 'w2') + IM('Contact#:', 'contact')) + '</div>' +
+            '<div class="mr-center" style="margin-top:14px"><div style="font-size:12px">Republic of the Philippines</div><div style="font-size:13px;font-weight:700">SOUTHERN LUZON STATE UNIVERSITY</div><div style="font-size:12px">Lucban, Quezon</div>' +
+            '<div style="font-size:13px;font-weight:700;margin-top:8px">DENTAL RECORD</div></div>' +
+            '<div class="mr-dent">' + legend + '<div style="flex:1;min-width:0;overflow-x:auto">' + chart + '</div></div>' +
+            '<div class="mr-center" style="font-weight:700;font-size:12px;margin-top:8px">TREATMENT PLAN</div>' +
+            '<div style="display:flex;justify-content:center;overflow-x:auto">' + tp + '</div>' +
+            '<div style="overflow-x:auto">' + sv + '</div>' +
+            '<div class="mr-foot2"><div class="mr-it" style="max-width:300px"><label>DATE:</label>' + F('dentDate') + '</div><div class="mr-sigline">Signature of Dentist</div></div>' +
+            '<div class="mr-priv">' + PRIV + '</div>' +
+            '<div class="mr-code">SLSU-JGE-AFA-HSU-1.0.F2<br>Effective: 102025</div><div class="mr-pg">2</div></div>';
+    }
+
+    function buildNurse() {
+        const nav = document.querySelector('#nurseSidebar nav');
+        const main = document.querySelector('#nurseDashboard main');
+        if (!nav || !main || $('navMedrec')) return;
+
+        const a = document.createElement('a');
+        a.href = '#'; a.id = 'navMedrec';
+        a.className = 'sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-blue-100';
+        a.innerHTML = '<i class="fa-solid fa-notes-medical w-5 text-center"></i> Medical Records';
+        a.addEventListener('click', e => { e.preventDefault(); showNurseTab('medrec'); });
+        ($('navCert') || $('navMonthly') || $('navAppointments')).insertAdjacentElement('afterend', a);
+
+        const v = document.createElement('div');
+        v.id = 'nurseViewMedrec'; v.className = 'hidden fade-in';
+        v.innerHTML =
+            '<div class="nx-hero mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">' +
+                '<div><div class="nx-chip mb-3"><i class="fa-solid fa-notes-medical"></i> Health Services Unit</div>' +
+                '<h2 class="text-2xl font-bold">Medical Records</h2>' +
+                '<p class="text-sm mt-1">1st Year students&#39; medical records. Open a student to view the full record (page 1) and the dental record (page 2), then fill in the rest and print.</p></div>' +
+            '</div>' +
+            '<div id="mrListBox" class="dashboard-card p-4 sm:p-6">' +
+                '<div class="flex flex-col sm:flex-row gap-3 mb-4">' +
+                    '<input type="text" id="mrSearch" placeholder="Search student name..." class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">' +
+                    '<button onclick="mrLoadList()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold"><i class="fa-solid fa-rotate mr-2"></i>Refresh</button>' +
+                '</div>' +
+                '<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="nx-table w-full text-sm min-w-max"><thead><tr>' +
+                    '<th class="text-center">#</th><th>Student</th><th>Course</th><th class="text-center">Student Form</th><th class="text-center">Action</th>' +
+                '</tr></thead><tbody id="mrListBody"></tbody></table></div>' +
+            '</div>' +
+            '<div id="mrDetailBox" class="hidden"></div>';
+        v.addEventListener('click', e => {
+            const c = e.target.closest('.mr-ck');
+            if (c && $('mrPaperWrap') && $('mrPaperWrap').contains(c)) c.classList.toggle('on');
+        });
+        v.addEventListener('input', e => { if (e.target.closest && e.target.closest('#mrP1')) sync(); });
+        v.addEventListener('paste', e => {
+            if (!(e.target.closest && e.target.closest('[contenteditable]'))) return;
+            e.preventDefault();
+            document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text'));
+        });
+        v.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && e.target.closest && e.target.closest('[contenteditable]')) e.preventDefault();
+        });
+        main.appendChild(v);
+        $('mrSearch').addEventListener('input', renderList);
+    }
+
+    async function loadList() {
+        try {
+            list = (await api('/api/medrec')).students;
+            renderList();
+        } catch (e) {
+            $('mrListBody').innerHTML = '<tr><td colspan="5" class="py-6 text-center text-red-500">' + esc(e.message) + '</td></tr>';
+        }
+    }
+    window.mrLoadList = loadList;
+
+    function renderList() {
+        const q = ($('mrSearch').value || '').trim().toLowerCase();
+        const rows = list.filter(s => !q || s.name.toLowerCase().includes(q));
+        if (!rows.length) {
+            $('mrListBody').innerHTML = '<tr><td colspan="5"><div class="nx-empty"><i class="fa-solid fa-folder-open"></i><p class="font-semibold text-gray-600">No 1st Year students found</p></div></td></tr>';
+            return;
+        }
+        $('mrListBody').innerHTML = rows.map((s, i) =>
+            '<tr><td class="text-center">' + (i + 1) + '</td>' +
+            '<td><div class="flex items-center gap-3"><div class="nx-avatar">' + esc(s.name.trim().charAt(0).toUpperCase()) + '</div><div class="font-semibold text-gray-800">' + esc(s.name) + '</div></div></td>' +
+            '<td>' + esc(s.course || '—') + '</td>' +
+            '<td class="text-center">' + (s.submitted
+                ? '<span class="px-2.5 py-1 rounded-full text-xs font-semibold status-approved">Submitted' + (s.submittedAt ? ' · ' + esc(s.submittedAt) : '') + '</span>'
+                : '<span class="px-2.5 py-1 rounded-full text-xs font-semibold status-pending">Not yet filled up</span>') + '</td>' +
+            '<td class="text-center"><button onclick="mrOpen(' + s.id + ')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold"><i class="fa-solid fa-folder-open mr-1"></i>Open</button></td></tr>'
+        ).join('');
+    }
+
+    window.mrOpen = async function (uid) {
+        try {
+            cur = await api('/api/medrec/' + uid);
+        } catch (e) { alert(e.message); return; }
+        const box = $('mrDetailBox');
+        box.innerHTML =
+            '<div class="dashboard-card p-4 mb-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">' +
+                '<div><div class="font-bold text-gray-800 text-lg">' + esc(cur.student.name) + '</div>' +
+                '<div class="text-sm ' + (cur.submitted ? 'text-green-600' : 'text-orange-600') + '">' +
+                (cur.submitted ? 'Student has submitted the form' : 'Student has not submitted yet (you can fill it in)') + '</div></div>' +
+                '<div class="flex flex-wrap gap-2">' +
+                    '<button onclick="mrBack()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium"><i class="fa-solid fa-arrow-left mr-1"></i>Back</button>' +
+                    '<div class="nx-seg"><button id="mrTab1" class="on" onclick="mrShowPage(1)">Page 1 · Medical</button><button id="mrTab2" onclick="mrShowPage(2)">Page 2 · Dental</button></div>' +
+                    '<button onclick="mrSave()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold"><i class="fa-solid fa-floppy-disk mr-1"></i>Save</button>' +
+                    '<button onclick="mrPrint()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold"><i class="fa-solid fa-print mr-1"></i>Print (2 pages)</button>' +
+                '</div></div>' +
+            '<div class="overflow-x-auto"><div id="mrPaperWrap">' + page1() + page2() + '</div></div>';
+        fillPaper();
+        $('mrListBox').classList.add('hidden');
+        box.classList.remove('hidden');
+        window.scrollTo(0, 0);
+    };
+
+    window.mrBack = function () {
+        $('mrDetailBox').classList.add('hidden');
+        $('mrListBox').classList.remove('hidden');
+        loadList();
+    };
+
+    window.mrShowPage = function (n) {
+        sync();
+        $('mrP1').classList.toggle('hidden', n !== 1);
+        $('mrP2').classList.toggle('hidden', n !== 2);
+        $('mrTab1').classList.toggle('on', n === 1);
+        $('mrTab2').classList.toggle('on', n === 2);
+    };
+
+    function fillPaper() {
+        const s = cur.student, n = cur.nurse || {};
+        $('mrPaperWrap').querySelectorAll('[data-k]').forEach(el => {
+            const k = el.dataset.k;
+            if (el.classList.contains('mr-ck')) { el.classList.toggle('on', n[k] === '1'); return; }
+            let v;
+            if (k === 'age') v = s.age;
+            else if (k === 'birthday') v = pretty(s.birthday);
+            else if (STU_KEYS.indexOf(k) >= 0) v = s[k];
+            else v = n[k];
+            el.textContent = (v === undefined || v === null) ? '' : v;
+        });
+        const d1 = $('mrPaperWrap').querySelector('[data-k="recDate"]');
+        const d2 = $('mrPaperWrap').querySelector('[data-k="dentDate"]');
+        if (d1 && !d1.textContent) d1.textContent = todayPretty();
+        if (d2 && !d2.textContent) d2.textContent = todayPretty();
+        sync();
+    }
+
+    // Page 2 header = kopya ng laman ng Page 1
+    function sync() {
+        const w = $('mrPaperWrap'); if (!w) return;
+        w.querySelectorAll('[data-m]').forEach(m => {
+            const src = w.querySelector('[data-k="' + m.dataset.m + '"]');
+            m.textContent = src ? src.textContent : '';
+        });
+    }
+
+    function collect() {
+        const student = {}, nurse = {};
+        $('mrPaperWrap').querySelectorAll('[data-k]').forEach(el => {
+            const k = el.dataset.k;
+            if (k === 'age') return;
+            if (k === 'birthday') { student.birthday = cur.student.birthday; return; }
+            if (el.classList.contains('mr-ck')) { if (el.classList.contains('on')) nurse[k] = '1'; return; }
+            const v = el.textContent.trim();
+            if (STU_KEYS.indexOf(k) >= 0) student[k] = v;
+            else if (v) nurse[k] = v;
+        });
+        return { student, nurse };
+    }
+
+    window.mrSave = async function () {
+        try {
+            const body = collect();
+            await api('/api/medrec/' + cur.userId, { method: 'POST', body: JSON.stringify(body) });
+            cur.nurse = body.nurse;
+            Object.assign(cur.student, body.student);
+            alert('Medical record saved.');
+        } catch (e) { alert(e.message); }
+    };
+
+    window.mrPrint = function () {
+        sync();
+        const wrap = $('mrPaperWrap').cloneNode(true);
+        wrap.querySelectorAll('[contenteditable]').forEach(e => e.removeAttribute('contenteditable'));
+        wrap.querySelectorAll('.hidden').forEach(e => e.classList.remove('hidden'));
+        const w = window.open('', '_blank', 'width=900,height=1100');
+        if (!w) { alert('Please allow pop-ups to print.'); return; }
+        w.document.write('<html><head><title>Medical Record</title><style>' + $('mrStyle').textContent +
+            '@page{size:8.5in 11in;margin:.4in}html,body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+            '.mr-paper{box-shadow:none;border:0;max-width:none;width:100%;margin:0;padding:0 .15in .3in;font-size:12px;line-height:1.7;page-break-after:always;min-height:0}' +
+            '.mr-paper:last-child{page-break-after:auto}.mr-ro{background:none}.mr-pg{bottom:0}' +
+            '.mr-head img{height:60px}.mr-title{margin:12px 0 6px}.mr-chart .mr-cell{height:30px}.mr-sv td{height:20px}' +
+            '</style></head><body>' + wrap.innerHTML + '</body></html>');
+        w.document.close(); w.focus();
+        setTimeout(() => w.print(), 600);
+    };
+
+    // ================= HOOKS =================
+    function hook() {
+        const prev = window.showNurseTab;
+        window.showNurseTab = function (tab) {
+            const v = $('nurseViewMedrec'), nv = $('navMedrec');
+            if (v) v.classList.add('hidden');
+            if (nv) nv.classList.remove('active');
+            if (tab === 'medrec') {
+                ['nurseViewDashboard', 'nurseViewAppointments', 'nurseViewHistory', 'nurseViewToday', 'nurseViewMonthly', 'nurseViewCert']
+                    .forEach(id => $(id) && $(id).classList.add('hidden'));
+                ['navDashboard', 'navHistory', 'navAppointments', 'navToday', 'navMonthly', 'navCert']
+                    .forEach(id => $(id) && $(id).classList.remove('active'));
+                v.classList.remove('hidden');
+                nv.classList.add('active');
+                if (!$('mrDetailBox').classList.contains('hidden')) { /* nasa detail pa rin */ } else { loadList(); }
+                const sb = $('nurseSidebar');
+                if (window.innerWidth < 768 && sb && !sb.classList.contains('-translate-x-full')) toggleNurseSidebar();
+            } else {
+                prev(tab);
+            }
+        };
+
+        const od = window.openDashboard;
+        window.openDashboard = function () {
+            od.apply(this, arguments);
+            if (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'Student') initStudent();
+        };
+
+        const lo = window.logoutSystem;
+        window.logoutSystem = async function () {
+            const r = await lo.apply(this, arguments);
+            if (typeof currentUser !== 'undefined' && !currentUser) {
+                const s = $('mrStuScreen'); if (s) s.classList.add('hidden');
+                const c = $('mrCard'); if (c) c.remove();
+                mrMe = null; gate = false;
+                if ($('mrDetailBox')) { $('mrDetailBox').classList.add('hidden'); $('mrListBox').classList.remove('hidden'); }
+            }
+            return r;
+        };
+    }
+
+    document.addEventListener('DOMContentLoaded', () => { buildNurse(); hook(); });
+})();
+</script>
+'''
+
+_MR_EXTRA = (_MR_EXTRA.replace("__MR_LOGO_L__", _LOGOS["L"])
+                      .replace("__MR_LOGO_M__", _LOGOS["M"])
+                      .replace("__MR_LOGO_R__", _LOGOS["R"]))
+
+_hrep("\n</body>\n</html>", _MR_EXTRA + "\n</body>\n</html>")
 
 # ===================== TAPOS NA ANG CLINIC UPDATE =====================
 # === RUN SERVER ===

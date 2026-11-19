@@ -3091,6 +3091,118 @@ _EXTRA = (_EXTRA.replace("__LOGO_L__", _LOGOS["L"])
                 .replace("__LOGO_R__", _LOGOS["R"]))
 
 _hrep("\n</body>\n</html>", _EXTRA + "\n</body>\n</html>")
+
+# =====================================================================
+# UPDATE: COURSE DROPDOWN + LASTNAME/FIRSTNAME/MIDDLENAME + 1ST YEAR -> MEDICAL RECORD FORM
+# =====================================================================
+COURSES = ("BSIT", "BSFAS", "BSBA", "BPA", "BSED", "BEED")
+
+
+# ---------- BACKEND: validation ng Create Account at ng Medical Record ----------
+@app.before_request
+def _check_register_v4():
+    if request.method != "POST":
+        return None
+
+    if request.path == "/api/register":
+        d = request.get_json(silent=True) or {}
+        parts = [p.strip() for p in str(d.get("name") or "").split(",")]
+        if len(parts) != 3 or not all(parts):
+            return jsonify(error="Full name must be: Lastname, Firstname, Middlename."), 400
+        if d.get("role") == "Student" and (d.get("course") or "").strip() not in COURSES:
+            return jsonify(error="Please select your course."), 400
+
+    elif request.path == "/api/medrec/me":
+        d = request.get_json(silent=True) or {}
+        if (d.get("course") or "").strip() not in COURSES:
+            return jsonify(error="Please select your course."), 400
+
+    return None
+
+
+# ---------- FRONTEND: Full Name = Lastname, Firstname, Middlename ----------
+_hrep(
+    f'<input type="text" id="regName" class="{_INP}" placeholder="Juan Dela Cruz">',
+    f'''<input type="hidden" id="regName">
+            <div class="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2">
+              <input type="text" id="regLast" class="{_INP}" placeholder="Lastname" autocomplete="family-name">
+              <input type="text" id="regFirst" class="{_INP}" placeholder="Firstname" autocomplete="given-name">
+              <input type="text" id="regMiddle" class="{_INP}" placeholder="Middlename" autocomplete="additional-name">
+            </div>
+            <p class="text-xs mt-1" style="color:#374151">Format: Lastname, Firstname, Middlename (all required)</p>''',
+)
+
+# ---------- FRONTEND: Course dropdown ----------
+_hrep(
+    f'<input type="text" id="regCourse" class="{_INP}" placeholder="e.g. BSIT (students)">',
+    f'''<select id="regCourse" class="{_INP}"><option value="">Select...</option>'''
+    + "".join(f"<option>{c}</option>" for c in COURSES)
+    + "</select>",
+)
+
+# ---------- FRONTEND: Course din sa Medical Record form ng student ----------
+_hrep(
+    "fld('Course to apply for', 'mrs_course', 'text') +",
+    "sel('Course to apply for', 'mrs_course', ['BSIT', 'BSFAS', 'BSBA', 'BPA', 'BSED', 'BEED']) +",
+)
+
+# ---------- FRONTEND: script ----------
+_V4_EXTRA = r'''
+<script>
+(function () {
+    const $ = id => document.getElementById(id);
+
+    // Pagsamahin ang 3 name fields -> "Lastname, Firstname, Middlename"
+    function syncName() {
+        const l = $('regLast').value.trim(), f = $('regFirst').value.trim(), m = $('regMiddle').value.trim();
+        $('regName').value = (l && f && m) ? (l + ', ' + f + ', ' + m) : '';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        ['regLast', 'regFirst', 'regMiddle'].forEach(id => {
+            const el = $(id);
+            if (el) el.addEventListener('input', syncName);
+        });
+        // Enter key sa bagong name fields
+        ['regLast', 'regFirst', 'regMiddle'].forEach(id => {
+            const el = $(id);
+            if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') registerUser(); });
+        });
+        // Course ay para sa Student lang
+        const role = $('regRole'), course = $('regCourse');
+        if (role && course) {
+            const wrap = course.parentElement;
+            const upd = () => { wrap.style.display = role.value === 'Student' ? '' : 'none'; if (role.value !== 'Student') course.value = ''; };
+            role.addEventListener('change', upd);
+            upd();
+        }
+    });
+
+    // Kapag 1st Year student ang nag-Create Account -> auto sign in -> diretso sa Medical Record form
+    const origApi = window.api;
+    window.api = async function (url, options) {
+        const res = await origApi(url, options);
+        if (url === '/api/register' && options && options.body) {
+            try {
+                const b = JSON.parse(options.body);
+                if (b.role === 'Student' && b.yearLevel === '1st Year') {
+                    const data = await origApi('/api/login', {
+                        method: 'POST',
+                        body: JSON.stringify({ email: b.email, password: b.password })
+                    });
+                    currentUser = data.user;
+                    $('authMsg').textContent = '';
+                    openDashboard();   // lalabas agad ang Medical Record form (personal info -> emergency)
+                }
+            } catch (e) { console.warn('Auto sign-in skipped:', e); }
+        }
+        return res;
+    };
+})();
+</script>
+'''
+
+_hrep("\n</body>\n</html>", _V4_EXTRA + "\n</body>\n</html>")
 # =====================================================================
 # MEDICAL RECORD (1st YEAR) + YEAR LEVEL
 # I-PASTE ang BUONG block na ito sa app.py, ISANG BESES LANG, mismo bago ang linyang:

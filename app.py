@@ -3091,7 +3091,6 @@ _EXTRA = (_EXTRA.replace("__LOGO_L__", _LOGOS["L"])
                 .replace("__LOGO_R__", _LOGOS["R"]))
 
 _hrep("\n</body>\n</html>", _EXTRA + "\n</body>\n</html>")
-
 # =====================================================================
 # UPDATE: COURSE DROPDOWN + LASTNAME/FIRSTNAME/MIDDLENAME + 1ST YEAR -> MEDICAL RECORD FORM
 # =====================================================================

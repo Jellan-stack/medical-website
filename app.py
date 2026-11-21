@@ -3463,10 +3463,14 @@ _MR_EXTRA = r'''
 .mr-chart td.lbl{font-size:8px;font-weight:700;letter-spacing:.08em;background:#fff;height:12px}
 .mr-chart td.ltr{font-weight:700;font-size:9px;height:14px}
 .mr-chart .mr-cell{height:24px;font-size:10px;font-weight:700}
-.mr-chart .mr-tooth{height:32px;background-repeat:no-repeat;background-position:center;background-size:78% auto}
-.mr-chart .t-m{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='16' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M20 5V35M5 20H35' stroke='black' stroke-width='1.6'/%3E%3C/svg%3E")}
-.mr-chart .t-p{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='16' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M9 20H31' stroke='black' stroke-width='1.6'/%3E%3C/svg%3E")}
-.mr-chart .t-i{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cellipse cx='20' cy='20' rx='17' ry='11' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M12 21Q20 27 28 21' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E")}
+.mr-chart .mr-tooth{height:34px;background-repeat:no-repeat;background-position:center;background-size:auto 82%}
+.mr-chart .t-m{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='16' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M20 4V36M4 20H36' stroke='black' stroke-width='1.6'/%3E%3C/svg%3E")}
+.mr-chart .t-m6{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='16' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M20 4V36M4 20H36' stroke='black' stroke-width='1.4'/%3E%3Ccircle cx='20' cy='20' r='6' stroke='black' stroke-width='1.4' fill='none'/%3E%3C/svg%3E")}
+.mr-chart .t-p5{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='14' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M12 23Q20 30 28 23' stroke='black' stroke-width='1.6' fill='none'/%3E%3Ccircle cx='15' cy='15' r='1.6' fill='black'/%3E%3Ccircle cx='25' cy='15' r='1.6' fill='black'/%3E%3C/svg%3E")}
+.mr-chart .t-p4{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cellipse cx='20' cy='20' rx='17' ry='13' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M9 20H31' stroke='black' stroke-width='1.6'/%3E%3Cpath d='M20 20V28' stroke='black' stroke-width='1.4'/%3E%3C/svg%3E")}
+.mr-chart .t-c{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath d='M3 20Q20 3 37 20Q20 37 3 20Z' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M12 21Q20 27 28 21' stroke='black' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")}
+.mr-chart .t-i2{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cellipse cx='20' cy='20' rx='17' ry='10' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M11 22Q20 27 29 22' stroke='black' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")}
+.mr-chart .t-i1{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cellipse cx='20' cy='20' rx='16' ry='9' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M10 23Q20 16 30 23' stroke='black' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")}
 .mr-tp{border-collapse:collapse;font-family:Georgia,serif;font-size:11px;margin:6px 0 10px}
 .mr-tp td{border:1px solid #444;height:19px;min-width:90px;padding:0 3px}
 .mr-tp td.nm{border:0;text-align:right;padding-right:8px;min-width:150px}
@@ -3698,8 +3702,8 @@ _MR_EXTRA = r'''
 
     function page2() {
         const PERM = [8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8];
-        const pcls = n => n >= 6 ? 't-m' : (n >= 4 ? 't-p' : 't-i');
-        const DEC = ['t-m', 't-m', 't-i', 't-i', 't-i', 't-i', 't-i', 't-i', 't-m', 't-m'];
+        const pcls = n => ({ 8: 't-m', 7: 't-m', 6: 't-m6', 5: 't-p5', 4: 't-p4', 3: 't-c', 2: 't-i2', 1: 't-i1' })[n];
+        const DEC = ['t-m', 't-m', 't-c', 't-i2', 't-i1', 't-i1', 't-i2', 't-c', 't-m', 't-m'];
         const rng = (n, f) => Array.from({ length: n }, (_, i) => f(i)).join('');
         const N = k => '<td class="mr-cell" contenteditable="true" data-k="' + k + '"></td>';
         const T = (c, k) => '<td class="mr-cell mr-tooth ' + c + '" contenteditable="true" data-k="' + k + '"></td>';

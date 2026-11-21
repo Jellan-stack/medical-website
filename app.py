@@ -3453,24 +3453,59 @@ _MR_EXTRA = r'''
 .mr-dent{display:flex;gap:14px;align-items:flex-start;margin-top:8px}
 .mr-legend{width:30%;font-family:Georgia,serif;font-size:10.5px;line-height:1.25;flex-shrink:0}
 .mr-legend div{display:flex;gap:8px;margin-bottom:2px}.mr-legend b{width:26px;flex-shrink:0}
-.mr-chart{border-collapse:collapse;width:100%;table-layout:fixed;font-size:10px}
-.mr-chart th,.mr-chart td{border:1px solid #444;text-align:center;padding:0}
-.mr-chart th{font-size:10px;background:#f3f4f6}
-.mr-chart th.sub{background:#fff;font-size:9px;letter-spacing:.1em}
-.mr-chart{min-width:560px}
-.mr-chart td.sp{border:0;background:none}
-.mr-chart td.lab{font-size:8px;font-weight:700;line-height:1.15;background:#fff}
-.mr-chart td.lbl{font-size:8px;font-weight:700;letter-spacing:.08em;background:#fff;height:12px}
-.mr-chart td.ltr{font-weight:700;font-size:9px;height:14px}
-.mr-chart .mr-cell{height:24px;font-size:10px;font-weight:700}
-.mr-chart .mr-tooth{height:34px;background-repeat:no-repeat;background-position:center;background-size:auto 82%}
-.mr-chart .t-m{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='16' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M20 4V36M4 20H36' stroke='black' stroke-width='1.6'/%3E%3C/svg%3E")}
-.mr-chart .t-m6{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='16' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M20 4V36M4 20H36' stroke='black' stroke-width='1.4'/%3E%3Ccircle cx='20' cy='20' r='6' stroke='black' stroke-width='1.4' fill='none'/%3E%3C/svg%3E")}
-.mr-chart .t-p5{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='14' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M12 23Q20 30 28 23' stroke='black' stroke-width='1.6' fill='none'/%3E%3Ccircle cx='15' cy='15' r='1.6' fill='black'/%3E%3Ccircle cx='25' cy='15' r='1.6' fill='black'/%3E%3C/svg%3E")}
-.mr-chart .t-p4{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cellipse cx='20' cy='20' rx='17' ry='13' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M9 20H31' stroke='black' stroke-width='1.6'/%3E%3Cpath d='M20 20V28' stroke='black' stroke-width='1.4'/%3E%3C/svg%3E")}
-.mr-chart .t-c{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath d='M3 20Q20 3 37 20Q20 37 3 20Z' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M12 21Q20 27 28 21' stroke='black' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")}
-.mr-chart .t-i2{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cellipse cx='20' cy='20' rx='17' ry='10' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M11 22Q20 27 29 22' stroke='black' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")}
-.mr-chart .t-i1{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cellipse cx='20' cy='20' rx='16' ry='9' stroke='black' stroke-width='2' fill='none'/%3E%3Cpath d='M10 23Q20 16 30 23' stroke='black' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")}
+.dc .k-m8{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M9 13Q11 5 22 6Q30 3 38 8Q45 15 41 26Q37 36 25 35Q14 38 8 29Q4 20 9 13Z'/%3E%3Cpath d='M22 6Q22 16 24 21M24 21Q17 24 10 22M24 21Q30 26 35 34'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-m8b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M9 13Q11 5 22 6Q30 3 38 8Q45 15 41 26Q37 36 25 35Q14 38 8 29Q4 20 9 13Z'/%3E%3Cpath d='M22 6Q22 16 24 21M24 21Q17 24 10 22M24 21Q30 26 35 34'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-m7{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M9 13Q11 5 22 6Q30 3 38 8Q45 15 41 26Q37 36 25 35Q14 38 8 29Q4 20 9 13Z'/%3E%3Cpath d='M24 6Q22 20 25 35M8 21Q24 18 42 22'/%3E%3Cpath d='M15 12Q18 15 16 18'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-m7b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M9 13Q11 5 22 6Q30 3 38 8Q45 15 41 26Q37 36 25 35Q14 38 8 29Q4 20 9 13Z'/%3E%3Cpath d='M24 6Q22 20 25 35M8 21Q24 18 42 22'/%3E%3Cpath d='M15 12Q18 15 16 18'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-m6{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M9 13Q11 5 22 6Q30 3 38 8Q45 15 41 26Q37 36 25 35Q14 38 8 29Q4 20 9 13Z'/%3E%3Cpath d='M23 7Q20 20 24 35M9 19Q24 21 41 18M12 27Q24 24 37 29'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-m6b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M9 13Q11 5 22 6Q30 3 38 8Q45 15 41 26Q37 36 25 35Q14 38 8 29Q4 20 9 13Z'/%3E%3Cpath d='M23 7Q20 20 24 35M9 19Q24 21 41 18M12 27Q24 24 37 29'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-p5{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M10 20Q10 8 24 8Q38 8 38 21Q37 33 24 33Q11 33 10 20Z'/%3E%3Ccircle cx='19' cy='17' r='1.6' fill='black'/%3E%3Ccircle cx='29' cy='17' r='1.6' fill='black'/%3E%3Cpath d='M17 24Q24 30 31 24'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-p5b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M10 20Q10 8 24 8Q38 8 38 21Q37 33 24 33Q11 33 10 20Z'/%3E%3Ccircle cx='19' cy='17' r='1.6' fill='black'/%3E%3Ccircle cx='29' cy='17' r='1.6' fill='black'/%3E%3Cpath d='M17 24Q24 30 31 24'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-p5l{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M10 20Q10 8 24 8Q38 8 38 21Q37 33 24 33Q11 33 10 20Z'/%3E%3Cpath d='M24 14V22M24 22L18 27M24 22L30 27'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-p5lb{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M10 20Q10 8 24 8Q38 8 38 21Q37 33 24 33Q11 33 10 20Z'/%3E%3Cpath d='M24 14V22M24 22L18 27M24 22L30 27'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-p4{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M8 22Q6 12 18 10Q28 6 38 13Q42 24 33 31Q20 36 11 30Q8 27 8 22Z'/%3E%3Cpath d='M17 21Q24 19 31 21'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-p4b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M8 22Q6 12 18 10Q28 6 38 13Q42 24 33 31Q20 36 11 30Q8 27 8 22Z'/%3E%3Cpath d='M17 21Q24 19 31 21'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-c{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M3 20Q13 9 24 7Q35 9 45 20Q35 33 24 34Q13 33 3 20Z'/%3E%3Cpath d='M14 21Q24 27 34 21M24 13V18'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-cb{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M3 20Q13 9 24 7Q35 9 45 20Q35 33 24 34Q13 33 3 20Z'/%3E%3Cpath d='M14 21Q24 27 34 21M24 13V18'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-i2{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M6 20Q8 11 24 11Q40 11 42 20Q40 29 24 29Q8 29 6 20Z'/%3E%3Cpath d='M15 21Q24 26 33 21'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-i2b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M6 20Q8 11 24 11Q40 11 42 20Q40 29 24 29Q8 29 6 20Z'/%3E%3Cpath d='M15 21Q24 26 33 21'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-i1{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M5 19Q10 10 24 11Q38 10 43 19Q40 30 24 29Q8 30 5 19Z'/%3E%3Cpath d='M12 21Q24 27 36 21M19 15Q24 13 29 15'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-i1b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M5 19Q10 10 24 11Q38 10 43 19Q40 30 24 29Q8 30 5 19Z'/%3E%3Cpath d='M12 21Q24 27 36 21M19 15Q24 13 29 15'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-dm1{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M8 12Q10 5 24 5Q38 5 40 12Q44 22 40 30Q36 36 24 36Q12 36 8 30Q4 22 8 12Z'/%3E%3Cpath d='M24 5V36M6 20H42'/%3E%3Cpath d='M14 11Q17 14 15 17'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-dm1b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M8 12Q10 5 24 5Q38 5 40 12Q44 22 40 30Q36 36 24 36Q12 36 8 30Q4 22 8 12Z'/%3E%3Cpath d='M24 5V36M6 20H42'/%3E%3Cpath d='M14 11Q17 14 15 17'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-dm2{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M8 12Q10 5 24 5Q38 5 40 12Q44 22 40 30Q36 36 24 36Q12 36 8 30Q4 22 8 12Z'/%3E%3Cpath d='M24 5Q21 20 24 36M7 18Q24 24 41 18'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-dm2b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M8 12Q10 5 24 5Q38 5 40 12Q44 22 40 30Q36 36 24 36Q12 36 8 30Q4 22 8 12Z'/%3E%3Cpath d='M24 5Q21 20 24 36M7 18Q24 24 41 18'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-lm1{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M4 20Q6 9 24 9Q42 9 44 20Q42 31 24 31Q6 31 4 20Z'/%3E%3Cpath d='M10 19Q24 13 38 19M12 25Q24 28 36 23'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-lm1b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M4 20Q6 9 24 9Q42 9 44 20Q42 31 24 31Q6 31 4 20Z'/%3E%3Cpath d='M10 19Q24 13 38 19M12 25Q24 28 36 23'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-lm2{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cpath d='M4 20Q6 9 24 9Q42 9 44 20Q42 31 24 31Q6 31 4 20Z'/%3E%3Cpath d='M24 9Q20 20 24 31M8 20H40'/%3E%3C/g%3E%3C/svg%3E")}
+.dc .k-lm2b{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cg stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cg transform='translate(48 0) scale(-1 1)'%3E%3Cpath d='M4 20Q6 9 24 9Q42 9 44 20Q42 31 24 31Q6 31 4 20Z'/%3E%3Cpath d='M24 9Q20 20 24 31M8 20H40'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.dc{min-width:560px}
+.dc-w{position:relative}
+.dc-t{width:100%;border-collapse:collapse;table-layout:fixed}
+.dc-t td{border:1px solid #111;padding:0;text-align:center;font-size:10px;font-weight:700;line-height:1;overflow:hidden;outline:none}
+.dc-t tr.er td{height:20px}
+.dc-t tr.er.s td{height:14px}
+.dc-t tr.nr td{height:17px;font-size:11px;font-family:Georgia,serif;background:#fff}
+.dc-t tr.tr td{height:46px;border-top:0;border-bottom:0;border-left:0;border-right:0;vertical-align:bottom;background-repeat:no-repeat;background-position:center;background-size:auto 88%}
+.dc-t tr.tr td:first-child{border-left:1px solid #111}
+.dc-t tr.tr td:last-child{border-right:1px solid #111}
+.dc-t tr.tr.s td{height:38px}
+.dc-t td:focus{background-color:#eff6ff}
+.dc-lab{font-family:Georgia,serif;font-weight:700;font-size:12px;letter-spacing:.04em;text-align:center;line-height:13px;height:13px;background:#fff}
+.dc-labb,.dc-labt{position:absolute;left:50%;transform:translateX(-50%);padding:0 3px;pointer-events:none}
+.dc-labb{bottom:1px}.dc-labt{top:32px}
+.dc-mid{display:flex;width:87.4%;margin:0 auto;align-items:stretch}
+.dc-lt{align-items:center;margin-top:6px;margin-bottom:2px}
+.dc-box{flex:0 0 11.2%;border:1px solid #111;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Arial,sans-serif;font-weight:800;font-size:11px;line-height:1.15;background:#fff;box-sizing:border-box}
+.dc-ctr{flex:1;min-width:0}
+.dc-box+.dc-ctr{margin-left:-1px}
+.dc-ctr+.dc-box{margin-left:-1px}
+.dc-sp{flex:0 0 11.2%}
+.dc-lr{display:flex;align-items:center}
+.dc-lb{flex:0 0 35.6%}.dc-ab{flex:0 0 28.8%}
+.dc-lb .dc-t td{height:20px}
+.dc-a td{height:22px}
+
 .mr-tp{border-collapse:collapse;font-family:Georgia,serif;font-size:11px;margin:6px 0 10px}
 .mr-tp td{border:1px solid #444;height:19px;min-width:90px;padding:0 3px}
 .mr-tp td.nm{border:0;text-align:right;padding-right:8px;min-width:150px}
@@ -3702,30 +3737,38 @@ _MR_EXTRA = r'''
 
     function page2() {
         const PERM = [8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8];
-        const pcls = n => ({ 8: 't-m', 7: 't-m', 6: 't-m6', 5: 't-p5', 4: 't-p4', 3: 't-c', 2: 't-i2', 1: 't-i1' })[n];
-        const DEC = ['t-m', 't-m', 't-c', 't-i2', 't-i1', 't-i1', 't-i2', 't-c', 't-m', 't-m'];
         const rng = (n, f) => Array.from({ length: n }, (_, i) => f(i)).join('');
-        const N = k => '<td class="mr-cell" contenteditable="true" data-k="' + k + '"></td>';
-        const T = (c, k) => '<td class="mr-cell mr-tooth ' + c + '" contenteditable="true" data-k="' + k + '"></td>';
-        const sp = c => '<td class="sp" colspan="' + c + '"></td>';
-        const lab = (t, rs) => '<td class="lab" colspan="2" rowspan="' + rs + '">' + t + '</td>';
-        const L = arr => arr.map(c => '<td class="ltr">' + c + '</td>').join('');
-        const numRow = '<tr>' + PERM.map(n => '<th>' + n + '</th>').join('') + '</tr>';
-        const chart = '<table class="mr-chart">' +
-            '<tr>' + rng(16, i => N('pa' + i)) + '</tr>' + numRow +
-            '<tr>' + PERM.map((n, i) => T(pcls(n), 'tu' + i)).join('') + '</tr>' +
-            '<tr><td class="lbl" colspan="16">LABIAL</td></tr>' +
-            '<tr>' + sp(1) + lab('RIGHT<br>UPPER', 2) + rng(10, i => N('du' + i)) + lab('LEFT<br>UPPER', 2) + sp(1) + '</tr>' +
-            '<tr>' + sp(1) + rng(10, i => T(DEC[i], 'dt' + i)) + sp(1) + '</tr>' +
-            '<tr>' + sp(3) + L(['E', 'D', 'C', 'B']) + '<td class="lbl" colspan="2">LINGUAL</td>' + L(['B', 'C', 'D', 'E']) + sp(3) + '</tr>' +
-            '<tr>' + sp(3) + L(['E', 'D', 'C', 'B', 'A', 'A', 'B', 'C', 'D', 'E']) + sp(3) + '</tr>' +
-            '<tr>' + sp(7) + '<td class="lbl" colspan="2">LINGUAL</td>' + sp(7) + '</tr>' +
-            '<tr>' + sp(1) + lab('RIGHT<br>LOWER', 2) + rng(10, i => T(DEC[i], 'dl' + i)) + lab('LEFT<br>LOWER', 2) + sp(1) + '</tr>' +
-            '<tr>' + sp(1) + rng(10, i => N('dn' + i)) + sp(1) + '</tr>' +
-            '<tr>' + PERM.map((n, i) => T(pcls(n), 'tl' + i)).join('') + '</tr>' +
-            '<tr><td class="lbl" colspan="16">LABIAL</td></tr>' + numRow +
-            '<tr>' + rng(16, i => N('pb' + i)) + '</tr></table>';
+        const E = (k, c) => '<td contenteditable="true" data-k="' + k + '"' + (c ? ' class="k-' + c + '"' : '') + '></td>';
+        const UPN = ['m8', 'm7', 'm6', 'p5', 'p4', 'c', 'i2', 'i1', 'i1b', 'i2b', 'cb', 'p4b', 'p5b', 'm6b', 'm7b', 'm8b'];
+        const LON = ['m8', 'm7', 'm6', 'p5l', 'p4', 'c', 'i2', 'i1', 'i1b', 'i2b', 'cb', 'p4b', 'p5lb', 'm6b', 'm7b', 'm8b'];
+        const DU = ['dm1', 'dm2', 'c', 'i2', 'i1', 'i1b', 'i2b', 'cb', 'dm2b', 'dm1b'];
+        const DL = ['lm1', 'lm2', 'c', 'i2', 'i1', 'i1b', 'i2b', 'cb', 'lm2b', 'lm1b'];
+        const numRow = '<tr class="nr">' + PERM.map(n => '<td>' + n + '</td>').join('') + '</tr>';
+        const box = t => '<div class="dc-box">' + t + '</div>';
+        const ltr = arr => '<table class="dc-t"><tbody>' + [0, 1].map(() => '<tr>' + arr.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
 
+        const topT = '<div class="dc-w"><table class="dc-t"><tbody>' +
+            '<tr class="er">' + rng(16, i => E('pa' + i)) + '</tr>' + numRow +
+            '<tr class="tr">' + rng(16, i => E('tu' + i, UPN[i])) + '</tr></tbody></table><div class="dc-lab dc-labb">LABIAL</div></div>';
+
+        const midU = '<div class="dc-mid">' + box('RIGHT<br>UPPER') + '<div class="dc-ctr"><table class="dc-t"><tbody>' +
+            '<tr class="er s">' + rng(10, i => E('du' + i)) + '</tr>' +
+            '<tr class="tr s">' + rng(10, i => E('dt' + i, DU[i])) + '</tr></tbody></table></div>' + box('LEFT<br>UPPER') + '</div>';
+
+        const letters = '<div class="dc-mid dc-lt"><div class="dc-sp"></div><div class="dc-ctr dc-lr">' +
+            '<div class="dc-lb">' + ltr(['E', 'D', 'C', 'B']) + '</div>' +
+            '<div class="dc-ab"><div class="dc-lab">LINGUAL</div><table class="dc-t dc-a"><tbody><tr><td>A</td><td>A</td></tr></tbody></table><div class="dc-lab">LINGUAL</div></div>' +
+            '<div class="dc-lb">' + ltr(['B', 'C', 'D', 'E']) + '</div></div><div class="dc-sp"></div></div>';
+
+        const midL = '<div class="dc-mid">' + box('RIGHT<br>LOWER') + '<div class="dc-ctr"><table class="dc-t"><tbody>' +
+            '<tr class="tr s">' + rng(10, i => E('dl' + i, DL[i])) + '</tr>' +
+            '<tr class="er s">' + rng(10, i => E('dn' + i)) + '</tr></tbody></table></div>' + box('LEFT<br>LOWER') + '</div>';
+
+        const botT = '<div class="dc-w" style="margin-top:6px"><table class="dc-t"><tbody>' +
+            '<tr class="tr">' + rng(16, i => E('tl' + i, LON[i])) + '</tr>' + numRow +
+            '<tr class="er">' + rng(16, i => E('pb' + i)) + '</tr></tbody></table><div class="dc-lab dc-labt">LABIAL</div></div>';
+
+        const chart = '<div class="dc">' + topT + midU + letters + midL + botT + '</div>';
         const LEG = [['C', 'Dental Caries'], ['C1', 'Dental Caries with Vital Pulp Exposed'], ['C2', 'Dental Caries with Non Vital Pulp Exposed'],
             ['X', 'Indicated for Extraction'], ['RF', 'Retained Root Fragment'], ['AM', 'Amalgam Filling'], ['S', 'Silicate Filling'],
             ['GC', 'Gold Crown'], ['AB', 'Bridge Abutment'], ['P', 'Pontic'], ['U', 'Gold Clasp'], ['GI', 'Gold Inlay'],
@@ -3935,7 +3978,7 @@ _MR_EXTRA = r'''
             '@page{size:8.5in 11in;margin:.4in}html,body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
             '.mr-paper{box-shadow:none;border:0;max-width:none;width:100%;margin:0;padding:0 .15in .3in;font-size:12px;line-height:1.7;page-break-after:always;min-height:0}' +
             '.mr-paper:last-child{page-break-after:auto}.mr-ro{background:none}.mr-pg{bottom:0}' +
-            '.mr-head img{height:60px}.mr-title{margin:12px 0 6px}.mr-chart{min-width:0}.mr-chart .mr-cell{height:20px}.mr-chart .mr-tooth{height:26px}.mr-sv td{height:20px}' +
+            '.mr-head img{height:60px}.mr-title{margin:12px 0 6px}.dc{min-width:0}.dc-t tr.tr td{height:36px}.dc-t tr.tr.s td{height:30px}.dc-t tr.er td{height:16px}.dc-t tr.er.s td{height:11px}.dc-labt{top:24px}.mr-sv td{height:20px}' +
             '</style></head><body>' + wrap.innerHTML + '</body></html>');
         w.document.close(); w.focus();
         setTimeout(() => w.print(), 600);

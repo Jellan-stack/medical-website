@@ -3096,7 +3096,7 @@ _hrep("\n</body>\n</html>", _EXTRA + "\n</body>\n</html>")
 # =====================================================================
 import json
 
-YEAR_LEVELS = ("1st Year", "2nd Year", "3rd Year", "4th Year", "5th Year")
+YEAR_LEVELS = ("1st Year", "2nd Year", "3rd Year", "4th Year")
 MR_STUDENT_KEYS = ("name", "birthday", "gender", "civilStatus", "religion",
                    "nationality", "department", "course", "address", "contact",
                    "emName", "emAddress", "emContact")
